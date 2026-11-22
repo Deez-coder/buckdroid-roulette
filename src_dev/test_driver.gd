@@ -58,6 +58,8 @@ func _run() -> void:
 				_log("scene: " + (s.scene_file_path if s else "<none>"))
 			"tap":
 				await _touch(_to_window(Vector2(float(p[1]), float(p[2]))))
+			"drag":  # drag <dx> <dy>: finger down, move by (dx, dy) base pixels in 10 steps, finger up (relative mode)
+				await _drag(Vector2(float(p[1]), float(p[2])))
 			"click":
 				await _click(_to_window(Vector2(float(p[1]), float(p[2]))))
 			"joy":
@@ -176,6 +178,32 @@ func _touch(pos: Vector2) -> void:
 	r.pressed = false
 	Input.parse_input_event(r)
 	await get_tree().process_frame
+
+
+func _drag(delta: Vector2) -> void:
+	var start := _to_window(BASE / 2.0)
+	var scale := (_to_window(BASE) - _to_window(Vector2.ZERO)) / BASE
+	var t := InputEventScreenTouch.new()
+	t.index = 0
+	t.position = start
+	t.pressed = true
+	Input.parse_input_event(t)
+	await get_tree().process_frame
+	var pos := start
+	for i in 10:
+		var d := InputEventScreenDrag.new()
+		d.index = 0
+		d.relative = delta / 10.0 * scale
+		pos += d.relative
+		d.position = pos
+		Input.parse_input_event(d)
+		await get_tree().process_frame
+	var r := InputEventScreenTouch.new()
+	r.index = 0
+	r.position = pos
+	r.pressed = false
+	Input.parse_input_event(r)
+	await get_tree().create_timer(0.3, true, false, true).timeout
 
 
 func _click(pos: Vector2) -> void:

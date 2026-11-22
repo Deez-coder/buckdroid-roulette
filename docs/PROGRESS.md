@@ -46,8 +46,12 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 
 **Optimized: speed.** With Forward+, shadows were the whole cost (26 of 33 ms GPU at the idle table). The shadow optimizer in `src/render/render_settings.gd` ("mixed" mode plus skipping shadows for unlit lights) gives 60 fps at the dealer intro and 71 fps at the idle table on the S24 Ultra, with the face still very close to the PC. The cap is 60 fps. Measured per mode: cube 39/43, mixed 60/71, paraboloid –/96 fps (paraboloid visibly changes the face).
 
+**Playtest (user, full match won):** gameplay works start to finish. Reported: (1) noticeable warmth (phone skin about 38 °C afterwards, no throttling); (2) the end-of-run stats screen ignored taps ("press any button"); (3) requests for a relative cursor mode with size and speed options, and an fps/RAM overlay. Done in response: any-button fix, relative cursor mode, settings files (`config/*.ini`, UI-kit format), performance overlay, `fps_cap = 30` option. **Not yet confirmed on the phone.** The phone currently has `fps_counter = on`, `touch_mode = relative`, `cursor_size = 1.5`, `fps_cap = 60` in `/sdcard/Android/data/com.godot.game/files/config/`.
+
+**Heat decision pending:** compare `fps_cap = 30` against 60 on the phone (edit `graphics.ini`, restart the game) and pick the Android default.
+
 **Next steps:**
-1. The user plays a full game by hand on the phone with the current build. Watch for stutters (first-time shader compiles), heat over a longer session, anything that looks off.
+1. The user tests the new build (relative cursor, overlay, stats screen) and compares 30 vs 60 fps for heat. Watch for stutters (first-time shader compiles), heat over a longer session, anything that looks off.
 2. Identify the compute shader that fails on the Adreno with Forward+ (`vkCreateComputePipelines failed with error -13`, one per run). Nothing visible is missing in the tested scenes; check items, the endings and Double or Nothing.
 3. Remaining gameplay coverage: every item, a full run to the ending, Double or Nothing, the controller in-game.
 4. Phase 4: confirm-before-shoot on touch, bigger hit areas, Android back button, glyphs, haptics.

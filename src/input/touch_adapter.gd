@@ -1,33 +1,103 @@
 ## BuckdroidTouch - original code, part of Buckdroid Roulette.
 ##
-## Turns touches into the mouse events the game was written for, in the order the game needs.
+## Turns touches into the mouse events the game was written for. Two modes (controls.ini: touch_mode):
 ##
-## The game picks what is under the pointer over two frames (a camera raycast, then the interaction lookup) and only
-## acts on a click if something was already under the pointer. Godot's built-in touch-to-mouse emulation sends the
-## pointer move and the button press together, so every tap on a 3D object would miss. This adapter replaces it
-## (input_devices/pointing/emulate_mouse_from_touch is set to false by the installer): on touch down it moves the
-## pointer, waits HOVER_FRAMES frames, then presses; the release always follows its press. Only the first finger
-## acts as the mouse.
+## direct (default): the game is clicked where the finger touches. The game picks what is under the pointer over two
+##   frames (a camera raycast, then the interaction lookup) and only acts on a click if something was already under
+##   the pointer, while Godot's built-in touch emulation sends move and press together, so every tap on a 3D object
+##   missed. Here the pointer moves first, the press follows HOVER_FRAMES frames later, and the release always
+##   follows its press. (input_devices/pointing/emulate_mouse_from_touch is turned off by the installer.)
+##
+## relative: works like a laptop trackpad. Dragging moves an on-screen cursor (controls.ini: cursor_speed); a quick
+##   tap without movement clicks where the cursor is. The cursor is drawn with the game's own cursor images (pointer,
+##   hover, invalid) taken from its CursorManager, follows the game's own show/hide state, and switches to the hover
+##   image the same way the game's InteractionManager decides it. If those aren't available it uses the project's
+##   default cursor image.
+##
+## Both modes: "press any button" screens. Some game screens continue on any key press that reaches
+## _unhandled_input (e.g. the end-of-run stats). A tap becomes a mouse click that the screen's UI overlay consumes,
+## so the screen never saw it. While such a screen is waiting, a tap also sends a harmless InputEventAction
+## ("buckdroid_any_button") that the UI ignores. Only the screens listed in ANY_BUTTON_SCREENS get it, because other
+## screens (the key-rebinding menu) would capture it.
+##
+## Only the first finger acts as the mouse.
 extends Node
 
-const HOVER_FRAMES := 3          # frames between the pointer move and the press (3 frames = 50 ms at 60 fps)
+const HOVER_FRAMES := 3            # direct mode: frames between the pointer move and the press (50 ms at 60 fps)
+const TAP_SLOP := 8.0              # relative mode: movement (base pixels) below which a touch counts as a tap
+const TAP_TIME_MS := 350           # relative mode: longest touch that still counts as a tap
+const ANY_BUTTON_ACTION := &"buckdroid_any_button"
+## script file -> property that is true while that screen waits for "any button"
+const ANY_BUTTON_SCREENS := {"EndingManager.gd": "waitingForInput"}
+const CURSOR_HOTSPOTS := {"point": Vector2(12, 0), "hover": Vector2(9, 0), "invalid": Vector2(12, 0)}
 
-var _queue: Array = []           # [{frames_left: int, event: InputEvent}]
+var mode := "direct"
+var cursor_speed := 1.0           # controls.ini cursor_speed: cursor movement per finger movement (0.25 - 4)
+var cursor_size := 1.0            # controls.ini cursor_size: cursor image scale (0.5 - 3)
+
+var _queue: Array = []             # [{frames_left: int, event: InputEvent}]
 var _finger_down := false
 var _press_sent := false
 var _release_pending: InputEvent = null
 var _last_pos := Vector2.ZERO
 var _debug := OS.get_cmdline_user_args().has("--bd-touch-debug")
 
+# relative mode
+var _cursor := Vector2(480, 270)   # game base coordinates
+var _rel_start_ms := 0
+var _rel_moved := 0.0
+
+# game nodes found as they enter the tree
+var _any_screens: Array[Node] = []
+var _cursor_manager: Node = null
+var _interaction_manager: Node = null
+
+# cursor overlay
+var _layer: CanvasLayer
+var _cursor_rect: TextureRect
+var _fallback_texture: Texture2D
+var _fallback_hotspot := Vector2.ZERO
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	process_priority = -1000     # run before the game's _process so queued events land at the start of a frame
+	process_priority = -1000       # run before the game's _process so queued events land at the start of a frame
+	if not InputMap.has_action(ANY_BUTTON_ACTION):
+		InputMap.add_action(ANY_BUTTON_ACTION)
+	get_tree().node_added.connect(_on_node_added)
+	_build_cursor_overlay()
+	var settings := get_node_or_null(^"/root/BuckdroidSettings")
+	if settings:
+		settings.controls_changed.connect(_read_settings)
+	_read_settings()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--bd-touch-mode="):
+			mode = arg.trim_prefix("--bd-touch-mode=")
+	print("[buckdroid] touch mode=%s cursor_speed=%.2f cursor_size=%.2f" % [mode, cursor_speed, cursor_size])
 
+
+func _read_settings() -> void:
+	var settings := get_node_or_null(^"/root/BuckdroidSettings")
+	if settings == null:
+		return
+	var m: String = settings.get_value("controls", "touch_mode")
+	mode = m if m in ["direct", "relative"] else "direct"
+	cursor_speed = clampf(settings.get_float("controls", "cursor_speed", 1.0), 0.25, 4.0)
+	cursor_size = clampf(settings.get_float("controls", "cursor_size", 1.0), 0.5, 3.0)
+
+
+# --- input ---------------------------------------------------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
 	if _debug and (event is InputEventScreenTouch or event is InputEventMouseButton):
 		print("[bd-touch] in ", event)
+	if mode == "relative":
+		_input_relative(event)
+	else:
+		_input_direct(event)
+
+
+func _input_direct(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.index == 0:
 		if event.pressed:
 			_finger_down = true
@@ -35,6 +105,7 @@ func _input(event: InputEvent) -> void:
 			_release_pending = null
 			_move_to(event.position)
 			_queue.append({"frames_left": HOVER_FRAMES, "event": _button(event.position, true)})
+			_notify_any_button()
 		elif _finger_down:
 			_finger_down = false
 			var release := _button(event.position, false)
@@ -44,6 +115,27 @@ func _input(event: InputEvent) -> void:
 				_release_pending = release
 	elif event is InputEventScreenDrag and event.index == 0:
 		_move_to(event.position, event.relative, event.velocity)
+
+
+func _input_relative(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.index == 0:
+		if event.pressed:
+			_finger_down = true
+			_rel_start_ms = Time.get_ticks_msec()
+			_rel_moved = 0.0
+		elif _finger_down:
+			_finger_down = false
+			if _rel_moved < TAP_SLOP and Time.get_ticks_msec() - _rel_start_ms <= TAP_TIME_MS:
+				# The cursor has been resting on its target, so the game already knows what is under it.
+				_press_sent = false
+				_queue.append({"frames_left": 0, "event": _button(_cursor, true)})
+				_queue.append({"frames_left": 2, "event": _button(_cursor, false)})
+				_notify_any_button()
+	elif event is InputEventScreenDrag and event.index == 0:
+		_rel_moved += event.relative.length()
+		var size := get_viewport().get_visible_rect().size
+		_cursor = (_cursor + event.relative * cursor_speed).clamp(Vector2.ZERO, size - Vector2.ONE)
+		_move_to(_cursor, event.relative * cursor_speed)
 
 
 func _process(_delta: float) -> void:
@@ -62,6 +154,7 @@ func _process(_delta: float) -> void:
 				still.append({"frames_left": 1, "event": _release_pending})
 				_release_pending = null
 	_queue = still
+	_update_cursor()
 
 
 ## Events reach _input already in the game's base resolution; Input.parse_input_event expects window pixels.
@@ -76,7 +169,7 @@ func _move_to(pos: Vector2, relative := Vector2.ZERO, velocity := Vector2.ZERO) 
 	m.global_position = pos
 	m.relative = relative if relative != Vector2.ZERO else pos - _last_pos
 	m.velocity = velocity
-	m.button_mask = MOUSE_BUTTON_MASK_LEFT if _press_sent else 0
+	m.button_mask = MOUSE_BUTTON_MASK_LEFT if (_press_sent and _finger_down and mode == "direct") else 0
 	_last_pos = pos
 	Input.parse_input_event.call_deferred(m)
 
@@ -90,3 +183,86 @@ func _button(pos: Vector2, pressed: bool) -> InputEventMouseButton:
 	b.pressed = pressed
 	b.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
 	return b
+
+
+# --- "press any button" screens ------------------------------------------------------------------------------------
+
+func _on_node_added(node: Node) -> void:
+	var s: Script = node.get_script()
+	if s == null:
+		return
+	var file := s.resource_path.get_file()
+	if ANY_BUTTON_SCREENS.has(file):
+		_any_screens.append(node)
+	elif file == "CursorManager.gd":
+		_cursor_manager = node
+	elif file == "InteractionManager.gd":
+		_interaction_manager = node
+
+
+func _notify_any_button() -> void:
+	var waiting := false
+	var i := 0
+	while i < _any_screens.size():
+		var n := _any_screens[i]
+		if not is_instance_valid(n) or not n.is_inside_tree():
+			_any_screens.remove_at(i)
+			continue
+		if n.get(ANY_BUTTON_SCREENS[n.get_script().resource_path.get_file()]) == true:
+			waiting = true
+		i += 1
+	if not waiting:
+		return
+	var press := InputEventAction.new()
+	press.action = ANY_BUTTON_ACTION
+	press.pressed = true
+	var release := InputEventAction.new()
+	release.action = ANY_BUTTON_ACTION
+	release.pressed = false
+	_queue.append({"frames_left": 0, "event": press})
+	_queue.append({"frames_left": 1, "event": release})
+	if _debug:
+		print("[bd-touch] any-button screen waiting: sent ", ANY_BUTTON_ACTION)
+
+
+# --- cursor overlay (relative mode) --------------------------------------------------------------------------------
+
+func _build_cursor_overlay() -> void:
+	_layer = CanvasLayer.new()
+	_layer.layer = 128
+	add_child(_layer)
+	_cursor_rect = TextureRect.new()
+	_cursor_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_rect.visible = false
+	_layer.add_child(_cursor_rect)
+	var path: String = ProjectSettings.get_setting("display/mouse_cursor/custom_image", "")
+	if not path.is_empty() and ResourceLoader.exists(path):
+		_fallback_texture = load(path)
+		_fallback_hotspot = ProjectSettings.get_setting("display/mouse_cursor/custom_image_hotspot", Vector2.ZERO)
+
+
+func _update_cursor() -> void:
+	var show := mode == "relative"
+	var state := "point"
+	if show and is_instance_valid(_cursor_manager):
+		var cv = _cursor_manager.get("cursor_visible")
+		if cv != null:
+			show = bool(cv)
+	if show and is_instance_valid(_interaction_manager):
+		var branch = _interaction_manager.get("activeInteractionBranch")
+		if branch != null and is_instance_valid(branch) and branch.get("interactionAllowed") == true:
+			state = "invalid" if branch.get("interactionInvalid") == true else "hover"
+	var tex: Texture2D = null
+	var hotspot := Vector2.ZERO
+	if is_instance_valid(_cursor_manager):
+		tex = _cursor_manager.get("cursor_" + state)
+		hotspot = CURSOR_HOTSPOTS[state]
+	if tex == null:
+		tex = _fallback_texture
+		hotspot = _fallback_hotspot
+	_cursor_rect.visible = show and tex != null
+	if _cursor_rect.visible:
+		_cursor_rect.texture = tex
+		_cursor_rect.size = tex.get_size()
+		_cursor_rect.scale = Vector2.ONE * cursor_size
+		_cursor_rect.position = _cursor - hotspot * cursor_size

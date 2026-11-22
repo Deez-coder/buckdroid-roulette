@@ -37,6 +37,12 @@ var _key := {}                      # instance id -> true for key lights
 
 
 func _ready() -> void:
+	# graphics.ini (BuckdroidSettings): shadow_mode = cube | mixed | paraboloid, fps_cap = 30 | 60 | 0
+	var settings := get_node_or_null(^"/root/BuckdroidSettings")
+	var ini_mode: String = settings.get_value("graphics", "shadow_mode") if settings else ""
+	if ini_mode in ["cube", "mixed", "paraboloid"]:
+		shadow_mode = ini_mode
+		skip_zero_energy = true
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bd-shadow-mode="):
 			shadow_mode = arg.trim_prefix("--bd-shadow-mode=")
@@ -44,10 +50,14 @@ func _ready() -> void:
 	var root := get_tree().root
 	if is_android or OS.get_cmdline_user_args().has("--bd-mobile-render"):
 		root.positional_shadow_atlas_16_bits = false
-	# 60 fps cap on Android: phones with 120 Hz screens would otherwise render twice as many frames for no visible
-	# gain in this slow-paced game, and run hotter. --bd-fps-cap=<n> overrides (0 = unlimited).
+	# 60 fps cap on Android by default: phones with 120 Hz screens would otherwise render twice as many frames for no
+	# visible gain in this slow-paced game, and run hotter. graphics.ini fps_cap or --bd-fps-cap=<n> override it
+	# (30 roughly halves the GPU work; 0 = unlimited).
 	if is_android:
 		Engine.max_fps = 60
+	var ini_cap: String = settings.get_value("graphics", "fps_cap") if settings else ""
+	if ini_cap.is_valid_int():
+		Engine.max_fps = int(ini_cap)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bd-fps-cap="):
 			Engine.max_fps = int(arg.trim_prefix("--bd-fps-cap="))

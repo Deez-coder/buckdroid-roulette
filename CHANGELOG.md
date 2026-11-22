@@ -32,6 +32,15 @@ Format: each entry says **what**, **where** (our file or setting), and **why**.
 ### Input (`src/input/touch_adapter.gd`)
 - **Touch adapter**: a touch moves the pointer, then presses 3 frames (about 50 ms) later; the release always follows its press. Positions are converted from game space back to window pixels before re-sending. *Why:* the game only acts on a click when something was already under the pointer, so with Godot's emulation every tap on a 3D object missed.
 
+- **"Press any button" screens** (`touch_adapter.gd`): the end-of-run stats screen continues on any press that reaches the game's unhandled-input stage. A tap becomes a mouse click that the screen's UI overlay consumes, so taps did nothing (playtest report). While a listed screen is waiting (`EndingManager.waitingForInput`), a tap also sends a harmless input action (`buckdroid_any_button`) that the UI ignores. It's limited to listed screens because the key-rebinding menu would capture it as a new binding.
+- **Relative cursor mode** (`touch_adapter.gd`, `controls.ini: touch_mode = relative`): works like a laptop trackpad. Dragging moves an on-screen cursor and a quick tap clicks at the cursor. The cursor is drawn with the game's own cursor images (pointer, hover, invalid), loaded from the user's game files at runtime, and follows the game's own show/hide and hover state. `cursor_speed` (0.25–4) and `cursor_size` (0.5–3) adjust it. *Why:* requested in the playtest; precise pointing without a finger covering the target. Direct mode remains the default.
+
+### Settings (`src/core/settings.gd`, autoload `BuckdroidSettings`, loaded first)
+- Reads `config/graphics.ini` and `config/controls.ini` from the app's external files folder (the launcher UI kit's file format and location; `user://config` on desktop). Keys so far: `shadow_mode`, `fps_cap` (30 / 60 / 0), `fps_counter`, `touch_mode`, `cursor_speed`, `cursor_size`. `controls.ini` is re-read when it changes.
+
+### Performance overlay (`src/render/perf_overlay.gd`, `graphics.ini: fps_counter = on`)
+- Top-left panel: fps, frame time (average and worst), GPU time per frame, memory, video memory, renderer, shadow mode, fps cap. Off by default.
+
 ### Rendering (`src/render/transparency_fallback.gd`)
 - **Transparency fallback** (Android only): objects whose `transparency` is animated are hidden while fully transparent and shown again when the animation brings them back. *Why:* on the Mobile renderer on Android (tested on Adreno 750) animated transparency has no effect, so the DEALER/YOU choice text and blood stayed on screen. *Side effect:* those fades are instant instead of gradual.
 

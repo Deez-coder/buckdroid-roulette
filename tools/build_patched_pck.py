@@ -30,12 +30,14 @@ RES_PREFIX = "res://buckdroid/"
 # Our autoloads, in order. They are placed before the game's own so the Steam stub exists when the game's
 # Steam autoload starts. "*" marks them as global singletons (callable by name from scripts).
 AUTOLOADS = [
+    ("BuckdroidSettings", "core/settings.gd"),
     ("BuckdroidPlatform", "platform/platform.gd"),
     ("Steam", "platform/steam_stub.gd"),
     ("BuckdroidBoot", "core/boot.gd"),
     ("BuckdroidTouch", "input/touch_adapter.gd"),
     ("BuckdroidTransparencyFallback", "render/transparency_fallback.gd"),
     ("BuckdroidRender", "render/render_settings.gd"),
+    ("BuckdroidPerfOverlay", "render/perf_overlay.gd"),
 ]
 
 
