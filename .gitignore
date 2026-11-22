@@ -37,6 +37,7 @@ local.properties
 
 # Kept local until the launcher license is decided (see docs/DECISIONS.md)
 /launcher-ui-kit.zip
+/touch-controls-kit.zip
 
 # Tooling
 __pycache__/
