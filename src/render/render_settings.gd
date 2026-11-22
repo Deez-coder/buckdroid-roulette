@@ -76,6 +76,13 @@ func _ready() -> void:
 	var root := get_tree().root
 	if is_android or OS.get_cmdline_user_args().has("--bd-mobile-render"):
 		root.positional_shadow_atlas_16_bits = false
+		# Shadow atlas layout: 16 full-size slots (4 per quadrant) instead of Godot's default 8 full-size plus 80
+		# small ones. The dealer room has about 10-12 large, close shadow-casting lights; with only 8 big slots they
+		# took each other's slots every frame and redrew their shadows even when nothing changed. With 16, Godot's
+		# shadow caching holds (0 shadow draws on a still frame, from 834). Same memory; the picture stays the same to
+		# the eye (some shadows get their full resolution: 1.6% of pixels differ by speckle at shadow edges).
+		for q in 4:
+			root.set_positional_shadow_atlas_quadrant_subdiv(q, Viewport.SHADOW_ATLAS_QUADRANT_SUBDIV_4)
 	# 60 fps cap on Android by default: phones with 120 Hz screens would otherwise render twice as many frames for no
 	# visible gain in this slow-paced game, and run hotter. graphics.ini fps_cap or --bd-fps-cap=<n> override it
 	# (30 roughly halves the GPU work; 0 = unlimited).

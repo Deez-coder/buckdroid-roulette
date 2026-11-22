@@ -234,6 +234,9 @@ func _run() -> void:
 						g.cast_shadow = int(p[2])
 						cnt += 1
 				_log("castshadow %s = %s on %d meshes" % [pre, p[2], cnt])
+			"quadsub":  # quadsub <quadrant 0-3> <subdiv enum 0-6>: shadow atlas slots per quadrant (2 = 4 slots, 3 = 16, 4 = 64)
+				get_viewport().set_positional_shadow_atlas_quadrant_subdiv(int(p[1]), int(p[2]))
+				_log("shadow atlas quadrant %s subdiv = %s" % [p[1], p[2]])
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])

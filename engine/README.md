@@ -15,7 +15,7 @@ git -C engine/godot apply ../patches/*.patch
 
 | Patch | What it does | Shipped? |
 |---|---|---|
-| `0001-debug-shadow-dirty-log.patch` | Development diagnostic: with the `BUCKDROID_SHADOW_DEBUG` environment variable set, logs which instances force positional light shadows to be redrawn. | Dev builds only |
+| `0001-debug-shadow-dirty-log.patch` | Development diagnostic: with the `BUCKDROID_SHADOW_DEBUG` environment variable set, logs which instances mark positional light shadows dirty and which lights actually redraw their shadow. | Dev builds only |
 
 ## Build
 

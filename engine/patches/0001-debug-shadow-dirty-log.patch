@@ -1,5 +1,5 @@
 diff --git a/servers/rendering/renderer_scene_cull.cpp b/servers/rendering/renderer_scene_cull.cpp
-index c5eabba..f72f74a 100644
+index c5eabba..a3dfc48 100644
 --- a/servers/rendering/renderer_scene_cull.cpp
 +++ b/servers/rendering/renderer_scene_cull.cpp
 @@ -37,6 +37,30 @@
@@ -51,3 +51,11 @@ index c5eabba..f72f74a 100644
  		}
  
  		if (!p_instance->lightmap && geom->lightmap_captures.size()) {
+@@ -3246,6 +3274,7 @@ void RendererSceneCull::_render_scene(const RendererSceneRender::CameraData *p_c
+ 
+ 			if (redraw && max_shadows_used < MAX_UPDATE_SHADOWS) {
+ 				//must redraw!
++				BD_SHADOW_DIRTY_DEBUG(ins, "light shadow redrawn");
+ 				RENDER_TIMESTAMP("> Render Light3D " + itos(i));
+ 				light->shadow_dirty = _light_instance_update_shadow(ins, p_camera_data->main_transform, p_camera_data->main_projection, p_camera_data->is_orthogonal, p_camera_data->vaspect, p_shadow_atlas, scenario, p_screen_mesh_lod_threshold, p_visible_layers);
+ 				RENDER_TIMESTAMP("< Render Light3D " + itos(i));
