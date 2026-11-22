@@ -42,6 +42,7 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bd-config-dir="):
 			config_dir = arg.trim_prefix("--bd-config-dir=")
+	_write_defaults_if_missing()
 	for file in DEFAULTS:
 		_load(file)
 	_controls_mtime = FileAccess.get_modified_time(_path("controls"))
@@ -68,6 +69,40 @@ func _process(delta: float) -> void:
 		_controls_mtime = m
 		_load("controls")
 		controls_changed.emit()
+
+
+## The game creates the folder and files itself, so they belong to the app (a folder made from outside, e.g. over
+## adb, can be unreadable for the app). Each key gets a line of explanation, as the UI kit expects; the launcher
+## later changes values on their own lines and keeps the comments.
+const DEFAULT_FILES := {
+	"graphics": """; Buckdroid Roulette - graphics settings. A missing key means the default.
+; Shadow quality: cube = exact original shadows (heaviest), mixed = weak fill lights use cheaper shadows,
+; paraboloid = all lights use cheaper shadows (fastest, shading on faces changes). Empty = automatic.
+shadow_mode =
+; Frame rate limit: 60, 30 or 0 (no limit). Empty = automatic (60 on phones).
+fps_cap =
+; Performance overlay in the top-left corner: on or off.
+fps_counter = off
+""",
+	"controls": """; Buckdroid Roulette - touch settings. A missing key means the default.
+; direct = tap where you want to click; relative = drag to move a cursor like a trackpad, tap to click.
+touch_mode = direct
+; Cursor movement per finger movement in relative mode (0.25 - 4).
+cursor_speed = 1.00
+; Cursor size in relative mode (0.5 - 3).
+cursor_size = 1.00
+""",
+}
+
+
+func _write_defaults_if_missing() -> void:
+	DirAccess.make_dir_recursive_absolute(config_dir)
+	for file in DEFAULT_FILES:
+		if FileAccess.file_exists(_path(file)):
+			continue
+		var f := FileAccess.open(_path(file), FileAccess.WRITE)
+		if f:
+			f.store_string(DEFAULT_FILES[file])
 
 
 func _path(file: String) -> String:

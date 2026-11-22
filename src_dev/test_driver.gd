@@ -129,7 +129,8 @@ func _run() -> void:
 					var l: Light3D = _shadow_lights[i]
 					if not is_instance_valid(l):
 						continue
-					if p[1] == "all" or (p[1] == "zero" and l.light_energy <= 0.01) or p[1] == str(i):
+					var parab: bool = l is OmniLight3D and l.omni_shadow_mode == OmniLight3D.SHADOW_DUAL_PARABOLOID
+					if p[1] == "all" or (p[1] == "zero" and l.light_energy <= 0.01) or (p[1] == "parab" and parab) or p[1] == str(i):
 						l.shadow_enabled = on
 						picked += 1
 				_log("shadow %s %s (%d lights)" % [p[1], p[2], picked])
@@ -351,6 +352,7 @@ func _fps(seconds: float, label: String) -> void:
 	var frames := 0
 	var worst := 0.0
 	var gpu_total := 0.0
+	var cpu_total := 0.0
 	var t0 := Time.get_ticks_usec()
 	var last := t0
 	while Time.get_ticks_usec() - t0 < int(seconds * 1e6):
@@ -360,9 +362,10 @@ func _fps(seconds: float, label: String) -> void:
 		last = now
 		frames += 1
 		gpu_total += RenderingServer.viewport_get_measured_render_time_gpu(vp_rid)
+		cpu_total += (Performance.get_monitor(Performance.TIME_PROCESS) + Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
 	var avg_ms := (last - t0) / 1000.0 / maxi(frames, 1)
-	_log("fps %s: %.1f fps avg (%.1f ms), worst frame %.1f ms, gpu %.1f ms avg, cap=%d" % [label, 1000.0 / avg_ms, avg_ms,
-			worst, gpu_total / maxi(frames, 1), Engine.max_fps])
+	_log("fps %s: %.1f fps avg (%.1f ms), worst frame %.1f ms, gpu %.1f ms avg, main loop %.2f ms, cap=%d" % [label,
+			1000.0 / avg_ms, avg_ms, worst, gpu_total / maxi(frames, 1), cpu_total / maxi(frames, 1), Engine.max_fps])
 
 
 func _texinfo(needle: String) -> void:
