@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# HARD RULE: no game data ever enters this repository.
+# Anything extracted, recovered, converted or patched from Buckshot Roulette
+# lives only in the folders below (or outside the repo) and is never committed.
+# ---------------------------------------------------------------------------
+/.work/
+/.cache/
+/recovered/
+*.pck
+*.exe
+*.dll
+*.ctex
+*.scn
+*.oggvorbisstr
+*.fontdata
+*.sample
+*.import
+*.remap
+project.binary
+*.shell
+
+# Build outputs
+/build/
+/engine/godot/
+/engine/out/
+*.apk
+*.aab
+*.so
+*.o
+*.obj
+
+# Signing material, never committed
+*.keystore
+*.jks
+keystore.properties
+local.properties
+
+# Kept local until the launcher license is decided (see docs/DECISIONS.md)
+/launcher-ui-kit.zip
+
+# Tooling
+__pycache__/
+*.pyc
+.godot/
+.import/
+.gradle/
+.idea/
+.vscode/

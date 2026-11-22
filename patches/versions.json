@@ -1,0 +1,42 @@
+{
+  "_comment": "Game versions this launcher supports, and the project-setting overrides it applies. Identification data only (sizes and hashes of the user's own files); contains no game content.",
+  "supported": [
+    {
+      "id": "v2.2.0-h6",
+      "name": "Buckshot Roulette v2.2.0 (hotfix 6), Steam, Windows",
+      "engine": "4.1.1",
+      "exe_sha256": "df2f8a31bd469438a1a29f831945ccea7b26963ab735f73b32936792207b1663",
+      "exe_size": 796325472,
+      "pck_offset_in_exe": 57826816,
+      "pck_sha256": "1853bd9b7f756f7821dc7986757e09d4c9f2c2d5c67edd85cc997b435e78841c",
+      "project_binary_md5": "233b672b50d0742e59947c00953c5d60",
+      "patch_dir": "v2.2.0-h6"
+    }
+  ],
+  "overrides": {
+    "common": {
+      "application/boot_splash/minimum_display_time": 0,
+      "application/config/use_custom_user_dir": true,
+      "application/config/custom_user_dir_name": "BuckdroidRoulette",
+      "input_devices/pointing/emulate_mouse_from_touch": false
+    },
+    "android": {
+      "rendering/renderer/rendering_method": "mobile",
+      "rendering/renderer/rendering_method.mobile": "mobile",
+      "rendering/shading/overrides/force_vertex_shading.mobile": false,
+      "rendering/shading/overrides/force_lambert_over_burley.mobile": false,
+      "rendering/lights_and_shadows/positional_shadow/atlas_size.mobile": 4096,
+      "rendering/lights_and_shadows/positional_shadow/atlas_16_bits": false,
+      "rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality.mobile": 2,
+      "rendering/lights_and_shadows/directional_shadow/size.mobile": 4096,
+      "rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality.mobile": 2,
+      "rendering/environment/glow/upscale_mode.mobile": 1,
+      "rendering/reflections/sky_reflections/texture_array_reflections.mobile": true,
+      "rendering/reflections/sky_reflections/ggx_samples.mobile": 32,
+      "rendering/reflections/reflection_atlas/reflection_size.mobile": 256,
+      "rendering/textures/vram_compression/import_etc2_astc": true,
+      "display/window/handheld/orientation": 4,
+      "debug/file_logging/enable_file_logging": true
+    }
+  }
+}
