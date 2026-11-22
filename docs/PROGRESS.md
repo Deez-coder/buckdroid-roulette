@@ -40,30 +40,36 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 - **Textures:** 874 S3TC textures (416 MB). Phones don't report S3TC, so Godot finds no loadable variant and scene loading fails. Needs ETC2 transcoding (dev builds use a software-decode shortcut for now).
 - **Screen:** without immersive mode, Android reserves the status bar and the game draws in a smaller, offset box. Godot 4.1's Android runner turns immersive mode on with the `--use_immersive` argument.
 
-## Where we stopped (2026-11-22, second session)
+## Where we stopped (2026-11-22, end of day)
 
-**Solved: the dealer's face.** Godot 4.1's Mobile renderer drops the shadows on the dealer on the Adreno 750; Forward+ on the phone matches the PC (dealer-area brightness 19.5 vs 19.0, deterministic intro frames). Android now uses Forward+.
+**Heat and performance, Galaxy S24 Ultra, 15 min idle at the table, no idle pacing (unattended runs, `.work/heatab*.sh`):**
 
-**Optimized: speed.** With Forward+, shadows were the whole cost (26 of 33 ms GPU at the idle table). The shadow optimizer in `src/render/render_settings.gd` ("mixed" mode plus skipping shadows for unlit lights) gives 60 fps at the dealer intro and 71 fps at the idle table on the S24 Ultra, with the face still very close to the PC. The cap is 60 fps. Measured per mode: cube 39/43, mixed 60/71, paraboloid –/96 fps (paraboloid visibly changes the face).
+| Run | Build | Skin max | Processor max | Throttling |
+|---|---|---|---|---|
+| A | Forward+, mixed shadows | 42.1 °C | 49.1 °C | status 2 after 13 min |
+| B | A + idle pacing (best case, still screen) | 36.0 °C | 38.9 °C | none |
+| C | A + blinker fix | 39.1 °C | 46.8 °C | none |
+| D | C + 16-slot shadow atlas | 39.0 °C | 45.5 °C | none |
 
-**Playtest (user, full match won):** gameplay works start to finish. Reported: (1) noticeable warmth (phone skin about 38 °C afterwards, no throttling); (2) the end-of-run stats screen ignored taps ("press any button"); (3) requests for a relative cursor mode with size and speed options, and an fps/RAM overlay. Done in response: any-button fix, relative cursor mode, settings files (`config/*.ini`, UI-kit format), performance overlay, `fps_cap = 30` option. **Not yet confirmed on the phone.** The phone currently has `fps_counter = on`, `touch_mode = relative`, `cursor_size = 1.5`, `fps_cap = 60` in `/sdcard/Android/data/com.godot.game/files/config/`.
+GPU per frame at the idle table, uncapped: original 26.2 ms → mixed 13.1 → blinker fix ~9.7 → atlas layout ~9.7 in a run where the default layout measured 11.6 (run-to-run spread is about 1-2 ms). Shadow draw calls per frame: 2,451 → 1,396 → 1,197 (0 on a still frame). The look matches the PC (frame-by-frame checks).
 
-**Heat work (second playtest session):** the user asked for real optimizations rather than only an fps cap. Measured (uncapped; with the cap the GPU clock drops and times read flat): no single big cost left after the shadow optimizer; several ~1 ms options (softness, atlas size, render scale). The table's fill-light shadows only matter when the dealer's face is visible, so the new default **adaptive** shadow mode switches them by whether the dealer's head is on screen: GPU at the idle table 13.1 → about 9.7 ms with the same look. The user confirmed the relative cursor works well. Still open: how warm the phone gets now over a long session (user to judge), and `fps_cap = 30` as an extra option.
+**Findings that matter for next time:**
+- Godot 4.1 does cache positional shadows, but two things defeated it here: the 32 blinking table indicators (material swaps) and too few full-size shadow atlas slots. Both fixed in `src/render/render_settings.gd`.
+- What still redraws: the fill lights that reach the dealer, because his animation really moves him (a second animation besides the head bob). Pausing the head bob alone changes nothing.
+- At a 60 fps cap, extra GPU savings now show up only weakly in temperature: the rest is screen, CPU, and USB charging during tests. A real-play session (not idle) with all fixes hasn't been measured yet.
+- The idle-pacing feature only helps on still screens; the user pointed out real play rarely stays still for 2 s. It stays on (free), but it isn't the heat fix.
+- Measurement rules: compare GPU costs uncapped (`fpscap 0`); with the cap the phone lowers its GPU clock. Read live temperatures from "Current temperatures from HAL" in `dumpsys thermalservice`, not "Cached temperatures". Use `adb -s R5CY54G6DWF` (an emulator from another project is often attached). The user allowed launching/stopping the test app over adb; never send taps. "Stay awake" is on (the user turned it on).
 
-**Heat, round 3 (2026-11-22 evening):** second long playtest with adaptive shadows: skin 32 → 41 °C in about 20 minutes, thermal status 1 (light throttling); items lost their shadows at the table view, so adaptive was reverted (back to "mixed"). Freeze test on the phone: pausing every animation saves no GPU time, so Godot 4.1 redraws shadows every frame regardless. CPU about 0.8 core. New: idle frame pacing (30 fps while the picture is still). Unattended A/B heat test (15 min idle at the table, `.work/heatab.sh`): without idle pacing 33 → 42.1 °C (throttling status 2); with it 33 → 36.0 °C (no throttling). Best case only: the user pointed out real play rarely stays still for 2 s.
+**Engine:** Godot 4.1.1 source in `engine/godot/` (gitignored), Windows runtime builds with `engineuild_windows.bat` (about 11 min clean, 1 min incremental). Patch `engine/patches/0001` is a diagnostic (`BUCKDROID_SHADOW_DEBUG=1` logs dirty/redrawn shadows). The Android engine build (needed for on-device texture conversion and the launcher) is not set up yet: needs Android SDK, NDK r23c, JDK 17.
 
-**Recon (draw-work counts, PC = same as phone):** per frame in the dealer room, the shadow passes draw 2,451 draw calls / 1.06 M triangles versus 182 / 72 k for the visible picture. With every animation frozen and nothing changing (verified for 20 frames), Godot 4.1 still redraws nearly all shadow maps every frame, so its shadow caching never kicks in here. Hiding the dealer or the smoker doesn't stop it. Candidate casters (outdoor props, the hidden crushed head) turned out not to cost anything. **Decision: shadow caching in our own engine build** (`engine/`), done next.
+**New from the user:** `touch-controls-kit.zip` (on-screen controller, GPL-3.0, gitignored) is to be used for an on-screen controller in the launcher phase, next to the launcher UI kit.
 
-**Found and fixed (no engine change needed):** the engine diagnostic (patch 0001, custom Windows runtime built with `engine/build_windows.bat`) showed the 32 blinking table indicators (material swaps by `BlinkerBranch`) marking every table light's shadow dirty every frame. With their shadow casting off, Godot's own caching works: shadow draws 2,451 → 1,396 per frame running, 834 frozen; phone GPU 12.1 → 9.7 ms at the idle table; no visible change. What still triggers redraws: the dealer's head bob (real movement) and the smoker (other room, no effect on the dealer room's lights). Running total at the idle table on the S24 Ultra (uncapped GPU per frame): original 26.2 ms → mixed 13.1 → + blinker fix 9.7 ms. Heat run C (blinker fix, no idle pacing, 15 min idle): skin 39.1 °C, no throttling, against 42.1 °C and throttling status 2 in run A. Checked and ruled out: pausing the dealer's head bob (no change in shadow draws). Then the atlas layout fix (16 full-size slots, Android): the four fill lights near the table were evicting each other from Godot's 8 default full-size slots and redrawing every frame. Now: still frame 0 shadow draws, animating 1,197 (only the fill lights that reach the moving dealer redraw; the dealer has a second animation besides the head bob). Phone, same run: 11.6 → 9.7 ms GPU at the idle table.
-
-**Next steps:**
-1. The user tests the new build (relative cursor, overlay, stats screen) and compares 30 vs 60 fps for heat. Watch for stutters (first-time shader compiles), heat over a longer session, anything that looks off.
-2. Identify the compute shader that fails on the Adreno with Forward+ (`vkCreateComputePipelines failed with error -13`, one per run). Nothing visible is missing in the tested scenes; check items, the endings and Double or Nothing.
-3. Remaining gameplay coverage: every item, a full run to the ending, Double or Nothing, the controller in-game.
-4. Phase 4: confirm-before-shoot on touch, bigger hit areas, Android back button, glyphs, haptics.
-5. Phase 5: presets (High = Forward+ "mixed"/"cube", Medium = paraboloid or Mobile, Low = Compatibility), auto-detect by GPU, shader warm-up, measurements on low- and mid-range phones (devices still needed).
-
-**Test-run notes:** compare only deterministic frames (`.work/td.txt` / `td2.txt` for the dealer intro; repeated door taps make it robust against slow loads). The test driver now has `fps`, `env`, `envset`, `overlays`, `shadowlist`, `shadow`, `omnimode`, `call`. An Android emulator from another of the user's projects is often connected: always use `adb -s R5CY54G6DWF`.
+**Next steps (suggested order):**
+1. A real-play heat session with all fixes (the user plays; temperatures recorded in the background).
+2. If still too warm: measure CPU time per thread, try a lower screen-resolution scale option, and test without USB charging for a fair number.
+3. Android engine build setup (SDK/NDK/JDK 17) — needed for the launcher and on-device texture conversion.
+4. Phase 4 controls (confirm-before-shoot, hit areas, back button, controller glyphs, haptics) and the on-screen controller from the user's kit.
+5. Phase 6 launcher with the user's UI kit; license decision (MIT vs GPL-3.0) is still open with the user.
 
 ### Earlier notes on the face investigation (first session)
 What was known then:
