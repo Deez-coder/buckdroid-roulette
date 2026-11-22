@@ -9,10 +9,10 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 |---|---|---|
 | 1. Audit | Done | Findings below. |
 | 2. Desktop proof of concept | Done | Plays on stock Godot 4.1.1 with our autoloads; first round played by touch only. |
-| 2b. Manual Android test build | In progress | Runs on a Galaxy S24 Ultra (Snapdragon 8 Gen 3, Android 16) with real ETC2 textures and the Mobile renderer. Colours now match the PC. **Open: the dealer's face still looks wrong to the user (shadows/shading).** |
+| 2b. Manual Android test build | Done | Runs on a Galaxy S24 Ultra (Snapdragon 8 Gen 3, Android 16) with ETC2 textures and Forward+. Look matches the PC, including the dealer's face. |
 | 3. Platform stubbing | Started | Steam stub, local achievements, offline leaderboard and the multiplayer lock are in. Platform/Multiplayer interfaces and MULTIPLAYER_NOTES.md still to do. |
 | 4. Input | Started | Touch adapter is in. Confirm-before-shoot, bigger hit areas, back button, glyphs and haptics still to do. |
-| 5. Rendering and performance | Started | Renderer chosen (Mobile/Vulkan), transparency fallback is in. ETC2 transcoding, presets and profiling still to do. |
+| 5. Rendering and performance | In progress | Forward+ on capable phones; ETC2 transcoding (PC reference); shadow optimizer: 60–71 fps on the S24 Ultra; 60 fps cap. Still to do: presets, auto-detect, shader warm-up, low/mid-range devices, on-device transcoding. |
 | 6. Launcher | Not started | Will use the user's launcher UI kit (native Java views). |
 | 7. Verification | Not started | |
 
@@ -22,7 +22,7 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 |---|---|---|---|
 | Launcher architecture | Native Android launcher built with the user's UI kit; the game runs in a Godot activity in its own process | User | Gives the kit's exact look, the system file picker, D-pad focus and notch handling for free. |
 | Decompiler on the phone (gdsdecomp) | Not included | Claude | The game's scripts are plain text in the PCK (Godot 4.1 has no bytecode), so no decompiling is needed; gdsdecomp releases probably no longer build against 4.1.1. GDRE Tools stays a PC-only analysis aid. |
-| Android renderer | Mobile (Vulkan) | Claude, after the user's visual report | Side-by-side screenshots: Mobile is almost identical to the PC's Forward+; Compatibility (OpenGL) loses the colour adjustments, glow and contrast. Compatibility stays as a planned fallback for weak/old GPUs. |
+| Android renderer | Forward+ (same as the PC) on capable phones | Claude, after the user's visual reports | Compatibility loses colour adjustments and glow. Mobile looked identical on the PC, but on the Adreno 750 it drops the shadows on the dealer's face. Forward+ on the phone matches the PC frame for frame. Mobile and Compatibility stay as candidates for weaker phones. |
 | `using_steam` | Left on | Claude | Keeps the Steam edition's content (bathroom CRT leaderboard machine, achievements); the stub answers offline. Turning it off made the game call itself the itch.io edition. |
 | User data folder | `BuckdroidRoulette` (custom user dir) | Claude | Test builds must never read or write the PC game's real saves. |
 | **License** | **Open — needs the user** | — | The UI kit is GPL-3.0-or-later. Either the user relicenses the kit (if they own all of it) and the project is MIT, or the project is GPL-3.0. |
@@ -40,9 +40,23 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 - **Textures:** 874 S3TC textures (416 MB). Phones don't report S3TC, so Godot finds no loadable variant and scene loading fails. Needs ETC2 transcoding (dev builds use a software-decode shortcut for now).
 - **Screen:** without immersive mode, Android reserves the status bar and the game draws in a smaller, offset box. Godot 4.1's Android runner turns immersive mode on with the `--use_immersive` argument.
 
-## Where we stopped (2026-11-22, end of session)
+## Where we stopped (2026-11-22, second session)
 
-**Investigating:** the dealer's face on the phone still looks flat compared with the PC (user-confirmed). What is known:
+**Solved: the dealer's face.** Godot 4.1's Mobile renderer drops the shadows on the dealer on the Adreno 750; Forward+ on the phone matches the PC (dealer-area brightness 19.5 vs 19.0, deterministic intro frames). Android now uses Forward+.
+
+**Optimized: speed.** With Forward+, shadows were the whole cost (26 of 33 ms GPU at the idle table). The shadow optimizer in `src/render/render_settings.gd` ("mixed" mode plus skipping shadows for unlit lights) gives 60 fps at the dealer intro and 71 fps at the idle table on the S24 Ultra, with the face still very close to the PC. The cap is 60 fps. Measured per mode: cube 39/43, mixed 60/71, paraboloid –/96 fps (paraboloid visibly changes the face).
+
+**Next steps:**
+1. The user plays a full game by hand on the phone with the current build. Watch for stutters (first-time shader compiles), heat over a longer session, anything that looks off.
+2. Identify the compute shader that fails on the Adreno with Forward+ (`vkCreateComputePipelines failed with error -13`, one per run). Nothing visible is missing in the tested scenes; check items, the endings and Double or Nothing.
+3. Remaining gameplay coverage: every item, a full run to the ending, Double or Nothing, the controller in-game.
+4. Phase 4: confirm-before-shoot on touch, bigger hit areas, Android back button, glyphs, haptics.
+5. Phase 5: presets (High = Forward+ "mixed"/"cube", Medium = paraboloid or Mobile, Low = Compatibility), auto-detect by GPU, shader warm-up, measurements on low- and mid-range phones (devices still needed).
+
+**Test-run notes:** compare only deterministic frames (`.work/td.txt` / `td2.txt` for the dealer intro; repeated door taps make it robust against slow loads). The test driver now has `fps`, `env`, `envset`, `overlays`, `shadowlist`, `shadow`, `omnimode`, `call`. An Android emulator from another of the user's projects is often connected: always use `adb -s R5CY54G6DWF`.
+
+### Earlier notes on the face investigation (first session)
+What was known then:
 - The colour problem is solved: it came from the dev-only S3TC software decoding. With ETC2 the frames' average colour matches the PC within about 1%.
 - Shadows: a same-frame experiment on the phone showed the 16-bit positional shadow atlas loses most shadows on the Adreno 750, and 32-bit brings them back. Setting `positional_shadow/atlas_16_bits = false` as a project setting did **not** change the result (the table frame stayed at the 16-bit brightness). So a runtime override was added, `src/render/render_settings.gd` (autoload `BuckdroidRender`), which sets the root viewport to 32-bit on Android and logs `[buckdroid] shadow atlas ... 16-bit=...`. **It is built into the code but not yet tested on the phone.**
 - Frame comparisons must use moments that always play the same way. Shell order is random, so "after the shot" differs between runs (one run's player shot themselves). Use the intro right after signing the waiver: `.work/td.txt` takes dealer shots 14–23 s after Enter. Capture the PC reference with the same script, using Forward+ without `--rendering-method`.
@@ -52,7 +66,9 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 2. If the face still differs: try other shadow settings at runtime (soft shadow quality, shadow bias/normal bias on the dealer's lights, atlas quadrant subdivisions). Also check the per-object light limit of the Mobile renderer (8 omni lights per mesh; the dealer room has about 18 shadowed omnis). It looked identical on the desktop Mobile renderer, but driver-side culling may differ. Check fragment precision on Adreno too.
 3. Last resort: compare against the Forward+ renderer on the phone (`rendering_method.mobile = forward_plus`) to see whether the Mobile renderer itself is the cause.
 
-**State of the phone:** the test app `com.godot.game` is installed with a 739 MB test PCK in its app storage (`/sdcard/Android/data/com.godot.game/files/`). The current APK auto-plays the script in `tp.txt` when opened. To remove it: uninstall the app, which also deletes its files.
+(Outcome: steps 1–2 confirmed the 32-bit atlas works but wasn't enough; step 3, Forward+, was the answer.)
+
+**State of the phone:** the test app `com.godot.game` is installed with a 739 MB test PCK in its app storage (`/sdcard/Android/data/com.godot.game/files/`). The APK runs whatever script is in `tp.txt` when opened; it's currently empty, so the game plays normally. To remove everything: uninstall the app, which also deletes its files.
 
 ## Open items (next steps, in order)
 
@@ -78,5 +94,6 @@ Rules learned the hard way:
 
 ## Log
 
+- **2026-11-22 (second session)** Deterministic frame comparison showed the 32-bit atlas works but the dealer's face still lacked shadows on the Mobile renderer; Forward+ on the phone matches the PC, so Android switched to Forward+. Profiled on the phone: shadows were the whole cost (37 fps → 120 fps without them). Built the shadow optimizer (skip unlit lights, paraboloid fill lights): 60–71 fps with the face intact. 60 fps cap.
 - **2026-11-22 (later)** Phone visuals: found Godot's phone-only quality cuts (vertex shading etc.) and set them to the PC values. Found that the S3TC software decoding washed out colours, and wrote the ETC2 transcoder; colours now match. Found the 16-bit shadow atlas losing shadows on Adreno, and added a runtime 32-bit override (untested). Test driver gained `inspect`, `lights`, `mobile_settings`, `texinfo`, `setall`, `vp`. Rule: compare only deterministic frames.
 - **2026-11-22** Phase 1 audit. Repo set up with a strict `.gitignore`. PC tools (`gdpck.py`, `ecfg.py`, `build_patched_pck.py`). Steam stub, platform, boot (multiplayer lock), touch adapter, dev test driver. Desktop: full intro, waiver and first round by touch; controller menu navigation works. Android: official 4.1.1 template plus `_cl_` main-pack test APK; runs on S24 Ultra; switched to Mobile renderer; transparency fallback; immersive mode.

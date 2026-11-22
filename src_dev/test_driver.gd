@@ -17,6 +17,8 @@ const BASE := Vector2(960, 540)
 
 var _steps: PackedStringArray = []
 var _out := "user://bd_shots"
+var _hidden_overlays: Array[CanvasItem] = []
+var _shadow_lights: Array[Light3D] = []
 
 
 func _ready() -> void:
@@ -80,6 +82,69 @@ func _run() -> void:
 					n.set(p[2], str_to_var(p[3]))
 					count += 1
 				_log("setall %s.%s = %s on %d nodes" % [p[1], p[2], p[3], count])
+			"fps":  # fps <seconds> <label>: average / worst frame time and GPU time over a window
+				await _fps(float(p[1]), p[2] if p.size() > 2 else "")
+			"env":  # every WorldEnvironment's expensive features
+				for we in get_tree().current_scene.find_children("*", "WorldEnvironment", true, false):
+					var e: Environment = we.environment
+					if e:
+						_log("env %s: ssao=%s ssil=%s ssr=%s sdfgi=%s glow=%s vol_fog=%s fog=%s adjust=%s tonemap=%d bg=%d" % [
+								we.get_path(), e.ssao_enabled, e.ssil_enabled, e.ssr_enabled, e.sdfgi_enabled, e.glow_enabled,
+								e.volumetric_fog_enabled, e.fog_enabled, e.adjustment_enabled, e.tonemap_mode, e.background_mode])
+			"envset":  # envset <property> <value>: on every WorldEnvironment's Environment
+				for we in get_tree().current_scene.find_children("*", "WorldEnvironment", true, false):
+					if we.environment:
+						we.environment.set(p[1], str_to_var(p[2]))
+				_log("envset %s = %s" % [p[1], p[2]])
+			"overlays":  # overlays <true|false>: show/hide 2D nodes drawn with a ShaderMaterial (screen effects)
+				var shown := p[1] == "true"
+				if not shown:
+					_hidden_overlays.clear()
+					for ci in get_tree().current_scene.find_children("*", "CanvasItem", true, false):
+						if ci.material is ShaderMaterial and ci.visible:
+							ci.visible = false
+							_hidden_overlays.append(ci)
+				else:
+					for ci in _hidden_overlays:  # only the ones this step hid
+						if is_instance_valid(ci):
+							ci.visible = true
+				_log("overlays visible=%s (%d changed)" % [shown, _hidden_overlays.size()])
+			"softshadow":  # softshadow <0-5>: soft shadow filter quality (positional + directional)
+				RenderingServer.positional_soft_shadow_filter_set_quality(int(p[1]))
+				RenderingServer.directional_soft_shadow_filter_set_quality(int(p[1]))
+				_log("soft shadow quality = " + p[1])
+			"shadowlist":  # remember every visible light that casts shadows right now, with an index
+				_shadow_lights.clear()
+				for n in get_tree().current_scene.find_children("*", "Light3D", true, false):
+					if n.is_visible_in_tree() and n.shadow_enabled:
+						_shadow_lights.append(n)
+						_log("  shadow light %d: %s energy=%.2f range=%.1f" % [_shadow_lights.size() - 1, n.name,
+								n.light_energy, n.omni_range if n is OmniLight3D else 0.0])
+			"shadow":  # shadow <index|all|zero> <on|off>: only lights from the last shadowlist
+				var on := p[2] == "on"
+				var picked := 0
+				for i in _shadow_lights.size():
+					var l: Light3D = _shadow_lights[i]
+					if not is_instance_valid(l):
+						continue
+					if p[1] == "all" or (p[1] == "zero" and l.light_energy <= 0.01) or p[1] == str(i):
+						l.shadow_enabled = on
+						picked += 1
+				_log("shadow %s %s (%d lights)" % [p[1], p[2], picked])
+			"omnimode":  # omnimode <0|1>: dual paraboloid (0) or cube (1) for the listed omni lights
+				for l in _shadow_lights:
+					if is_instance_valid(l) and l is OmniLight3D:
+						l.omni_shadow_mode = int(p[1])
+				_log("omni shadow mode = " + p[1])
+			"call":  # call <autoload name> <method> [string arg]
+				var target := get_node_or_null(NodePath("/root/" + p[1]))
+				if target and target.has_method(p[2]):
+					if p.size() > 3:
+						target.call(p[2], p[3])
+					else:
+						target.call(p[2])
+				else:
+					_log("call: %s.%s not found" % [p[1], p[2]])
 			"texinfo":  # texinfo <name substring>: materials and texture formats of matching meshes
 				_texinfo(p[1].to_lower())
 			"vp":  # vp <viewport property> <value>
@@ -250,6 +315,26 @@ func _lights(root: Node) -> void:
 			extra = "dir_mode=%d" % l.directional_shadow_mode
 		_log("  %s %s visible=%s energy=%.2f shadow=%s bias=%.3f blur=%.1f %s" % [l.get_class(), l.name,
 				l.is_visible_in_tree(), l.light_energy, l.shadow_enabled, l.shadow_bias, l.shadow_blur, extra])
+
+
+func _fps(seconds: float, label: String) -> void:
+	var vp_rid := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(vp_rid, true)
+	var frames := 0
+	var worst := 0.0
+	var gpu_total := 0.0
+	var t0 := Time.get_ticks_usec()
+	var last := t0
+	while Time.get_ticks_usec() - t0 < int(seconds * 1e6):
+		await get_tree().process_frame
+		var now := Time.get_ticks_usec()
+		worst = maxf(worst, (now - last) / 1000.0)
+		last = now
+		frames += 1
+		gpu_total += RenderingServer.viewport_get_measured_render_time_gpu(vp_rid)
+	var avg_ms := (last - t0) / 1000.0 / maxi(frames, 1)
+	_log("fps %s: %.1f fps avg (%.1f ms), worst frame %.1f ms, gpu %.1f ms avg, cap=%d" % [label, 1000.0 / avg_ms, avg_ms,
+			worst, gpu_total / maxi(frames, 1), Engine.max_fps])
 
 
 func _texinfo(needle: String) -> void:

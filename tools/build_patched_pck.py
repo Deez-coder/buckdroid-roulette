@@ -83,6 +83,8 @@ def main():
     ap.add_argument("--android", action="store_true", help="apply the Android settings overrides")
     ap.add_argument("--full-hash", action="store_true", help="also check the SHA-256 of the whole PCK")
     ap.add_argument("--dev", action="store_true", help="add the dev-only test driver (src_dev/); never for users")
+    ap.add_argument("--dev-renderer", choices=["forward_plus", "mobile", "gl_compatibility"],
+                    help="dev experiments only: force a renderer on every platform")
     ap.add_argument("--etc2-dir", help="folder written by tools/transcode_etc2.gd; adds the ETC2 textures, points "
                     "the remaps at them, and (with --android) leaves the desktop S3TC copies out")
     ap.add_argument("--dev-s3tc-fallback", action="store_true",
@@ -127,6 +129,10 @@ def main():
     overrides = versions["overrides"]["common"] | (versions["overrides"]["android"] if a.android else {})
     for k, v in overrides.items():
         pb.set(k, v)
+    if a.dev_renderer:
+        pb.set("rendering/renderer/rendering_method", a.dev_renderer)
+        pb.set("rendering/renderer/rendering_method.mobile", a.dev_renderer)
+        print(f"renderer forced to {a.dev_renderer} (dev)")
     replaced = {"res://project.binary": pb.to_bytes()}
     dropped = set()
     if a.etc2_dir:
