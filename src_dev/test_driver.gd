@@ -77,6 +77,32 @@ func _run() -> void:
 						_log("where %s: %s on screen at %s visible=%s %s" % [n.get_class(), n.global_position, scr,
 								n.is_visible_in_tree(), n.get_path()])
 				_log("where camera: %s %s" % [cam.global_position if cam else "none", cam.get_path() if cam else ""])
+			"anims":  # anims: every AnimationPlayer that is playing right now, its animation and the tracks it drives
+				for ap in get_tree().current_scene.find_children("*", "AnimationPlayer", true, false):
+					if ap.is_playing():
+						var a: Animation = ap.get_animation(ap.current_animation)
+						var tracks := []
+						if a:
+							for t in mini(a.get_track_count(), 6):
+								tracks.append(str(a.track_get_path(t)))
+						_log("anim playing: %s '%s' loop=%s tracks=%s" % [ap.get_path(), ap.current_animation,
+								a.loop_mode if a else "?", tracks])
+				for pt in get_tree().current_scene.find_children("*", "GPUParticles3D", true, false):
+					if pt.is_visible_in_tree() and pt.emitting:
+						_log("particles emitting: %s" % pt.get_path())
+			"pause":  # pause <AnimationPlayer name substring, _ for spaces> <true|false>
+				var needle := p[1].replace("_", " ").to_lower()
+				for ap in get_tree().current_scene.find_children("*", "AnimationPlayer", true, false):
+					if String(ap.name).to_lower().contains(needle):
+						ap.speed_scale = 0.0 if p[2] == "true" else 1.0
+						_log("pause %s = %s" % [ap.get_path(), p[2]])
+			"freeze":  # freeze <true|false>: pause every AnimationPlayer and particle system (rendering experiment)
+				var frozen := p[1] == "true"
+				for ap in get_tree().current_scene.find_children("*", "AnimationPlayer", true, false):
+					ap.speed_scale = 0.0 if frozen else 1.0
+				for pt in get_tree().current_scene.find_children("*", "GPUParticles3D", true, false):
+					pt.speed_scale = 0.0 if frozen else 1.0
+				_log("freeze = " + p[1])
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])

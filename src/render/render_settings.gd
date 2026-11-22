@@ -15,10 +15,12 @@
 ##    Modes: "cube" (original look), "mixed", "paraboloid". Desktop default "cube"; Android default below.
 ##    Override for testing: --bd-shadow-mode=<mode>. The game never changes these light settings itself.
 ##
-##    "adaptive" (Android default): like "mixed", plus the table's fill lights drop their shadows while the dealer's
+##    "adaptive" (optional, NOT the default): like "mixed", plus the table's fill lights drop their shadows while the dealer's
 ##      head isn't on screen. Those shadows only visibly shape his face; at the table view they make no visible
 ##      difference. S24 Ultra, idle table, uncapped: mixed 13.1 ms GPU, adaptive 9.5-9.9 ms (about 27% less); the
-##      dealer intro and the table view look the same as mixed.
+##      dealer intro and the empty table look the same as mixed. BUT items placed on the table lose their shadows
+##      while the dealer is off screen (playtest report): those fill lights also cast the items' shadows. Kept as an
+##      option for weak phones only.
 ##    Measured on the Galaxy S24 Ultra (Forward+), frame rate at the dealer intro / idle table:
 ##      cube 39 / 43 fps (dealer's face matches the PC), mixed 60 / 71 fps (face very close, same shading pattern),
 ##      paraboloid - / 96 fps (shadow pattern on the face visibly shifts). Hence "mixed" as the Android default.
@@ -30,7 +32,7 @@ extends Node
 
 const KEY_LIGHT_ENERGY := 15.0      # omni lights at or above this initial energy count as key lights
 const ZERO_ENERGY := 0.01
-const ANDROID_DEFAULT_MODE := "adaptive"
+const ANDROID_DEFAULT_MODE := "mixed"
 
 const MODES := ["cube", "mixed", "adaptive", "key_only", "paraboloid"]
 const DEALER_HEAD_NODE := &"dealer head mesh"   # the dealer's head mesh in the game's main scene

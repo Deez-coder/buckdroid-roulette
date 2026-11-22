@@ -38,6 +38,7 @@ AUTOLOADS = [
     ("BuckdroidTransparencyFallback", "render/transparency_fallback.gd"),
     ("BuckdroidRender", "render/render_settings.gd"),
     ("BuckdroidPerfOverlay", "render/perf_overlay.gd"),
+    ("BuckdroidIdlePacing", "render/idle_pacing.gd"),
 ]
 
 
