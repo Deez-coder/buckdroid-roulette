@@ -1,0 +1,53 @@
+diff --git a/servers/rendering/renderer_scene_cull.cpp b/servers/rendering/renderer_scene_cull.cpp
+index c5eabba..f72f74a 100644
+--- a/servers/rendering/renderer_scene_cull.cpp
++++ b/servers/rendering/renderer_scene_cull.cpp
+@@ -37,6 +37,30 @@
+ 
+ #include <new>
+ 
++// Buckdroid Roulette: development diagnostic. With the BUCKDROID_SHADOW_DEBUG environment variable set, logs (once
++// per 60 frames, up to 16 lines) which instances mark positional light shadows dirty, i.e. force them to be redrawn.
++#include "core/config/engine.h"
++#define BD_SHADOW_DIRTY_DEBUG(m_instance, m_why)                                                                  \
++	do {                                                                                                           \
++		static int bd_enabled = -1;                                                                                \
++		if (bd_enabled < 0) {                                                                                      \
++			bd_enabled = OS::get_singleton()->has_environment("BUCKDROID_SHADOW_DEBUG") ? 1 : 0;                   \
++		}                                                                                                          \
++		if (bd_enabled) {                                                                                          \
++			static uint64_t bd_frame = 0;                                                                          \
++			static int bd_count = 0;                                                                               \
++			uint64_t bd_f = Engine::get_singleton()->get_process_frames();                                         \
++			if (bd_f != bd_frame) {                                                                                \
++				bd_frame = bd_f;                                                                                   \
++				bd_count = 0;                                                                                      \
++			}                                                                                                      \
++			if ((bd_f % 60) == 0 && bd_count++ < 16) {                                                             \
++				print_line(vformat("[bd-shadow] frame %d %s: base_type %d at %s", (int64_t)bd_f, m_why,            \
++						(int)(m_instance)->base_type, (m_instance)->transform.origin));                            \
++			}                                                                                                      \
++		}                                                                                                          \
++	} while (false)
++
+ /* CAMERA API */
+ 
+ RID RendererSceneCull::camera_allocate() {
+@@ -1551,6 +1575,7 @@ void RendererSceneCull::_update_instance(Instance *p_instance) {
+ 		RSG::light_storage->light_instance_set_transform(light->instance, p_instance->transform);
+ 		RSG::light_storage->light_instance_set_aabb(light->instance, p_instance->transform.xform(p_instance->aabb));
+ 		light->shadow_dirty = true;
++		BD_SHADOW_DIRTY_DEBUG(p_instance, "light updated");
+ 
+ 		RS::LightBakeMode bake_mode = RSG::light_storage->light_get_bake_mode(p_instance->base);
+ 		if (RSG::light_storage->light_get_type(p_instance->base) != RS::LIGHT_DIRECTIONAL && bake_mode != light->bake_mode) {
+@@ -1637,6 +1662,9 @@ void RendererSceneCull::_update_instance(Instance *p_instance) {
+ 				InstanceLightData *light = static_cast<InstanceLightData *>(E->base_data);
+ 				light->shadow_dirty = true;
+ 			}
++			if (!geom->lights.is_empty()) {
++				BD_SHADOW_DIRTY_DEBUG(p_instance, "shadow caster updated");
++			}
+ 		}
+ 
+ 		if (!p_instance->lightmap && geom->lightmap_captures.size()) {

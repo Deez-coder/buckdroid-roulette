@@ -206,6 +206,26 @@ func _run() -> void:
 					if c is GeometryInstance3D:
 						what += " cast_shadow=%d" % c.cast_shadow
 					_log("  changed: %s %s" % [what, str(c.get_path()).trim_prefix("/root/main/")])
+			"animmats":  # shadow-casting meshes whose material uses TIME (Godot then redraws every shadow they're in, every frame)
+				var found := 0
+				for mi in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
+					if not (mi.is_visible_in_tree() and mi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF):
+						continue
+					var mats := []
+					if mi.material_override:
+						mats.append(mi.material_override)
+					if mi is MeshInstance3D and mi.mesh:
+						for s in mi.mesh.get_surface_count():
+							mats.append(mi.get_active_material(s))
+					for m in mats:
+						var cur: Material = m
+						while cur:
+							if cur is ShaderMaterial and cur.shader and cur.shader.code.contains("TIME"):
+								found += 1
+								_log("animmat: %s uses TIME (%s) cast_shadow=%d" % [str(mi.get_path()).trim_prefix("/root/main/"),
+										cur.shader.resource_path.get_file(), mi.cast_shadow])
+							cur = cur.next_pass
+				_log("animmats: %d" % found)
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])
