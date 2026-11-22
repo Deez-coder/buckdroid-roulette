@@ -226,6 +226,14 @@ func _run() -> void:
 										cur.shader.resource_path.get_file(), mi.cast_shadow])
 							cur = cur.next_pass
 				_log("animmats: %d" % found)
+			"castshadow":  # castshadow <name prefix, _ for spaces> <0|1>: shadow casting for meshes whose name starts with it
+				var pre := p[1].replace("_", " ")
+				var cnt := 0
+				for g in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
+					if String(g.name).begins_with(pre):
+						g.cast_shadow = int(p[2])
+						cnt += 1
+				_log("castshadow %s = %s on %d meshes" % [pre, p[2], cnt])
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])

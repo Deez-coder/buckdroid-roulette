@@ -97,8 +97,31 @@ func _ready() -> void:
 func _on_node_added(node: Node) -> void:
 	if node is Light3D:
 		_register.call_deferred(node)
+	elif node is GeometryInstance3D and _is_shadow_excluded(node):
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_excluded_count += 1
+		if _excluded_count == 1 or _excluded_count % 8 == 0:
+			print("[buckdroid] shadow casting off for %d indicator meshes (latest: %s)" % [_excluded_count, node.name])
 	elif node is MeshInstance3D and node.name == DEALER_HEAD_NODE:
 		_track_dealer.call_deferred(node)
+
+
+## Shadow caching fix. Godot only redraws a light's shadow when a shadow-casting object in its range changes, but the
+## game's 32 small blinking indicator lights inside the table devices are toggled by script many times a second.
+## Each toggle counted as a change, so every table light redrew its whole shadow map every frame (found with the
+## engine diagnostic in engine/patches/0001). Those meshes are tiny glowing indicators whose shadows can't be seen;
+## with shadow casting off, their blinking no longer touches any shadow and Godot's own caching works again.
+## Applies on every platform: it changes nothing visible and saves work everywhere.
+const SHADOW_EXCLUDED_PREFIXES := ["tabletop interior blinker"]
+var _excluded_count := 0
+
+
+func _is_shadow_excluded(node: Node) -> bool:
+	var n := String(node.name)
+	for prefix in SHADOW_EXCLUDED_PREFIXES:
+		if n.begins_with(prefix):
+			return true
+	return false
 
 
 func _register(light: Light3D) -> void:
