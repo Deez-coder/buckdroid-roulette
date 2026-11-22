@@ -38,6 +38,16 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	# Test scripts tap exact positions, so they run in direct touch mode whatever controls.ini says (the file is left
+	# alone). An empty script changes nothing, so the game plays normally. "touchmode <mode>" switches inside a script.
+	var has_steps := false
+	for raw in _steps:
+		if not raw.split("#")[0].strip_edges().is_empty():
+			has_steps = true
+	var touch := get_node_or_null(^"/root/BuckdroidTouch")
+	if has_steps and touch:
+		touch.mode = "direct"
+		_log("touch mode forced to direct for this test")
 	for raw in _steps:
 		var line := raw.split("#")[0].strip_edges()
 		if line.is_empty():
@@ -58,6 +68,24 @@ func _run() -> void:
 				_log("scene: " + (s.scene_file_path if s else "<none>"))
 			"tap":
 				await _touch(_to_window(Vector2(float(p[1]), float(p[2]))))
+			"where":  # where <name substring with _ for spaces>: world positions of matching 3D nodes, and the camera
+				var needle := p[1].replace("_", " ").to_lower()
+				var cam := get_viewport().get_camera_3d()
+				for n in get_tree().current_scene.find_children("*", "Node3D", true, false):
+					if String(n.name).to_lower().contains(needle):
+						var scr: Variant = cam.unproject_position(n.global_position) if cam else "-"
+						_log("where %s: %s on screen at %s visible=%s %s" % [n.get_class(), n.global_position, scr,
+								n.is_visible_in_tree(), n.get_path()])
+				_log("where camera: %s %s" % [cam.global_position if cam else "none", cam.get_path() if cam else ""])
+			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
+				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
+				Engine.max_fps = int(p[1])
+				_log("fps cap = " + p[1])
+			"touchmode":  # touchmode <direct|relative>
+				var tm := get_node_or_null(^"/root/BuckdroidTouch")
+				if tm:
+					tm.mode = p[1]
+				_log("touch mode = " + p[1])
 			"drag":  # drag <dx> <dy>: finger down, move by (dx, dy) base pixels in 10 steps, finger up (relative mode)
 				await _drag(Vector2(float(p[1]), float(p[2])))
 			"click":
