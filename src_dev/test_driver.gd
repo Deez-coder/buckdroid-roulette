@@ -103,6 +103,109 @@ func _run() -> void:
 				for pt in get_tree().current_scene.find_children("*", "GPUParticles3D", true, false):
 					pt.speed_scale = 0.0 if frozen else 1.0
 				_log("freeze = " + p[1])
+			"renderinfo":  # renderinfo <label>: objects / primitives / draw calls for the visible pass and the shadow passes
+				await RenderingServer.frame_post_draw
+				var vp := get_viewport().get_viewport_rid()
+				var info := []
+				for t in [RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, RenderingServer.VIEWPORT_RENDER_INFO_TYPE_SHADOW]:
+					info.append([RenderingServer.viewport_get_render_info(vp, t, RenderingServer.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME),
+							RenderingServer.viewport_get_render_info(vp, t, RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME),
+							RenderingServer.viewport_get_render_info(vp, t, RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME)])
+				_log("renderinfo %s: visible objects=%d tris=%d draws=%d | shadows objects=%d tris=%d draws=%d" % [
+						p[1] if p.size() > 1 else "", info[0][0], info[0][1], info[0][2], info[1][0], info[1][1], info[1][2]])
+			"casters":  # casters: biggest shadow-casting meshes near the camera by triangle count
+				var rows := []
+				for mi in get_tree().current_scene.find_children("*", "MeshInstance3D", true, false):
+					if mi.is_visible_in_tree() and mi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and mi.mesh:
+						var tris := 0
+						for s in mi.mesh.get_surface_count():
+							var arr: Array = mi.mesh.surface_get_arrays(s)
+							var idx = arr[Mesh.ARRAY_INDEX]
+							tris += (idx.size() if idx != null else arr[Mesh.ARRAY_VERTEX].size()) / 3
+						rows.append([tris, mi.mesh.get_surface_count(), mi.get_path()])
+				rows.sort_custom(func(a, b): return a[0] > b[0])
+				var total := 0
+				for r in rows:
+					total += r[0]
+				_log("casters: %d visible shadow-casting meshes, %d triangles total" % [rows.size(), total])
+				for r in rows.slice(0, 15):
+					_log("  caster %d tris, %d surfaces: %s" % r)
+			"castersnear":  # which shadow-casting meshes lie inside each shadowed light's range (what its shadow map draws)
+				var meshes := []
+				for mi in get_tree().current_scene.find_children("*", "MeshInstance3D", true, false):
+					if mi.is_visible_in_tree() and mi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and mi.mesh:
+						var tris := 0
+						for s in mi.mesh.get_surface_count():
+							var arr: Array = mi.mesh.surface_get_arrays(s)
+							var idx = arr[Mesh.ARRAY_INDEX]
+							tris += (idx.size() if idx != null else arr[Mesh.ARRAY_VERTEX].size()) / 3
+						meshes.append([mi, tris, mi.global_transform * mi.get_aabb()])
+				var union := {}
+				for l in get_tree().current_scene.find_children("*", "OmniLight3D", true, false):
+					if not (l.is_visible_in_tree() and l.shadow_enabled):
+						continue
+					var sphere_c: Vector3 = l.global_position
+					var r: float = l.omni_range
+					var n := 0
+					var t := 0
+					for m in meshes:
+						var box: AABB = m[2]
+						var closest := sphere_c.clamp(box.position, box.end)
+						if closest.distance_to(sphere_c) <= r:
+							n += 1
+							t += m[1]
+							union[m[0]] = m[1]
+					_log("light %s (energy %.1f, range %.0f, mode %d): %d casters, %d tris" % [l.name, l.light_energy, r,
+							l.omni_shadow_mode, n, t])
+				var rows := []
+				for k in union:
+					rows.append([union[k], str(k.get_path()).trim_prefix("/root/main/")])
+				rows.sort_custom(func(a, b): return a[0] > b[0])
+				_log("casters inside any shadowed light's range: %d" % rows.size())
+				for row in rows.slice(0, 25):
+					_log("  %6d tris  %s" % row)
+			"nodeinfo":  # nodeinfo <name substring, _ for spaces>: transform, world-space box, visibility, cast shadow
+				var nd := p[1].replace("_", " ").to_lower()
+				for n in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
+					if String(n.name).to_lower().contains(nd):
+						_log("nodeinfo %s: scale %s, world box %s, visible=%s self=%s cast_shadow=%d transparency=%.2f" % [
+								n.get_path(), n.global_transform.basis.get_scale(), n.global_transform * n.get_aabb(),
+								n.is_visible_in_tree(), n.visible, n.cast_shadow, n.transparency])
+			"hide":  # hide <name substring, _ for spaces> <true|false>: toggle visibility (experiments)
+				var hn := p[1].replace("_", " ").to_lower()
+				for n in get_tree().current_scene.find_children("*", "Node3D", true, false):
+					if String(n.name).to_lower() == hn:
+						n.visible = p[2] != "true"
+						_log("hide %s = %s" % [n.get_path(), p[2]])
+			"changers":  # changers <frames>: geometry and lights whose transform, visibility or light settings change
+				# while watched. Anything that changes inside a light's range forces that light's shadow to be redrawn.
+				var watched := get_tree().current_scene.find_children("*", "VisualInstance3D", true, false)
+				var first := {}
+				var changed := {}
+				for f in int(p[1]):
+					for n in watched:
+						if not is_instance_valid(n):
+							continue
+						var sig := [n.global_transform, n.is_visible_in_tree()]
+						if n is Light3D:
+							sig.append_array([n.light_energy, n.light_color, n.shadow_enabled])
+						if n is GeometryInstance3D:
+							sig.append_array([n.cast_shadow, n.transparency])
+						if n is GPUParticles3D:
+							sig.append(n.emitting)
+						var id := n.get_instance_id()
+						if not first.has(id):
+							first[id] = sig
+						elif first[id] != sig and not changed.has(id):
+							changed[id] = n
+					await get_tree().process_frame
+				_log("changers: %d of %d visual nodes changed over %s frames" % [changed.size(), watched.size(), p[1]])
+				for id in changed:
+					var c: Node = changed[id]
+					var what := c.get_class()
+					if c is GeometryInstance3D:
+						what += " cast_shadow=%d" % c.cast_shadow
+					_log("  changed: %s %s" % [what, str(c.get_path()).trim_prefix("/root/main/")])
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])
