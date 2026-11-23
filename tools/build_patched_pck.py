@@ -31,6 +31,7 @@ RES_PREFIX = "res://buckdroid/"
 # Steam autoload starts. "*" marks them as global singletons (callable by name from scripts).
 AUTOLOADS = [
     ("BuckdroidSettings", "core/settings.gd"),
+    ("BuckdroidCompat", "compat/newer_engine.gd"),
     ("BuckdroidPlatform", "platform/platform.gd"),
     ("Steam", "platform/steam_stub.gd"),
     ("BuckdroidBoot", "core/boot.gd"),

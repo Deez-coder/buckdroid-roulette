@@ -168,6 +168,56 @@ func _run() -> void:
 				_log("casters inside any shadowed light's range: %d" % rows.size())
 				for row in rows.slice(0, 25):
 					_log("  %6d tris  %s" % row)
+			"remesh":  # remesh <name substring, _ for spaces | *>: rebuild matching meshes from their own arrays in the
+				# running engine's current format (tests whether a newer engine's on-load upgrade of old meshes is at fault)
+				var rn := p[1].replace("_", " ").to_lower()
+				var rc := 0
+				var t0 := Time.get_ticks_msec()
+				for mi in get_tree().current_scene.find_children("*", "MeshInstance3D", true, false):
+					if mi.mesh is ArrayMesh and (rn == "*" or String(mi.name).to_lower().contains(rn)):
+						var old: ArrayMesh = mi.mesh
+						var nm := ArrayMesh.new()
+						for s in old.get_surface_count():
+							var flags := 0
+							if old.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS:
+								flags |= Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+							nm.add_surface_from_arrays(old.surface_get_primitive_type(s), old.surface_get_arrays(s), [], {}, flags)
+							nm.surface_set_material(s, old.surface_get_material(s))
+						nm.custom_aabb = old.custom_aabb
+						mi.mesh = nm
+						rc += 1
+				_log("remesh %s: %d meshes in %d ms" % [rn, rc, Time.get_ticks_msec() - t0])
+			"skintest":  # skintest <exact mesh name, + for spaces> <refresh|noskin|noskel|info>: skinning experiments
+				for mi in get_tree().current_scene.find_children("*", "MeshInstance3D", true, false):
+					if String(mi.name) != p[1].replace("+", " "):
+						continue
+					match p[2]:
+						"refresh":
+							var sp: NodePath = mi.skeleton
+							mi.skeleton = NodePath()
+							mi.skeleton = sp
+						"noskin":
+							mi.skin = null
+						"noskel":
+							mi.skeleton = NodePath()
+					var skn = mi.get_node_or_null(mi.skeleton)
+					_log("skintest %s %s: skeleton=%s (%s) skin=%s binds=%d gpos=%s scale=%s" % [mi.get_path(), p[2], mi.skeleton,
+							skn.get_class() if skn else "none", mi.skin != null, mi.skin.get_bind_count() if mi.skin else 0,
+							mi.global_position, mi.global_transform.basis.get_scale()])
+			"lightoff":  # lightoff <exact light name> <true|false>: hide a light by its exact name (underscores kept)
+				for l in get_tree().current_scene.find_children("*", "Light3D", true, false):
+					if String(l.name) == p[1].replace("+", " "):
+						l.visible = p[2] != "true"
+						_log("lightoff %s = %s" % [l.get_path(), p[2]])
+			"geodump":  # geodump <file name>: every 3D object's path, visibility, world position and scale, into <out>/<file>
+				# (compare two engine versions at the same moment of a script)
+				var gf := FileAccess.open(_out.path_join(p[1]), FileAccess.WRITE)
+				for n in get_tree().current_scene.find_children("*", "Node3D", true, false):
+					var gt: Transform3D = n.global_transform
+					gf.store_line("%s|%s|%.3f,%.3f,%.3f|%.3f,%.3f,%.3f" % [get_tree().current_scene.get_path_to(n), n.is_visible_in_tree(),
+							gt.origin.x, gt.origin.y, gt.origin.z, gt.basis.get_scale().x, gt.basis.get_scale().y, gt.basis.get_scale().z])
+				gf.close()
+				_log("geodump " + p[1])
 			"nodeinfo":  # nodeinfo <name substring, _ for spaces>: transform, world-space box, visibility, cast shadow
 				var nd := p[1].replace("_", " ").to_lower()
 				for n in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
