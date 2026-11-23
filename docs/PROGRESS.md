@@ -64,6 +64,8 @@ GPU per frame at the idle table, uncapped: original 26.2 ms → mixed 13.1 → b
 
 **Real-play session 2026-11-23 (official engine, before the budget):** unplugged, 21 min: 38.9 °C skin, throttling status 1, 50 fps average, 2,000-2,700 shadow draws per frame (moving items/hands/dealer), GPU about 18 ms per frame (capped, so clock-scaled). In-game telemetry logger (`telemetry = on`) works; Android doesn't let the app read temperatures (needs the launcher's Java code later). Budget measured on our engine: about 11-16% less GPU.
 
+**Real-play session 2 (our engine + budget, unplugged, 15 min in the dealer room):** shadow draws per frame about 2,000 → 1,420 (−29%), GPU 17.6 → 16.2 ms (−8%), time under 55 fps 56% → 38%, average fps 50.2 → 51.8; temperature right after 39.4 °C skin, throttling status 1 (morning: 38.9 °C, status 1, 17 min). Conclusion: the waste is gone; at 60 fps the GPU still needs about 16 of 16.7 ms per frame in real play, so savings show up as smoother frames, not lower temperature. Further heat reduction needs trade-offs (user decision pending): key lights' shadow budget, a cheaper shadow method for the large backroom light, a 3D render scale below 100%, or a lower frame rate in calm scenes.
+
 **New from the user:** `touch-controls-kit.zip` (on-screen controller, GPL-3.0, gitignored) is to be used for an on-screen controller in the launcher phase, next to the launcher UI kit.
 
 **Next steps (suggested order):**
