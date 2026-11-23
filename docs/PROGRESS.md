@@ -53,7 +53,7 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 |---|---|---|---|---|---|
 | 1 (morning) | official engine, mixed + blinker + atlas fixes | 38.9 °C | status 1 | ~2,000 | 17.6 |
 | 2 | + our engine with shadow budget | 39.4 °C | status 1 | ~1,420 | 16.2 |
-| 3 | + 60 Hz display (was 120 Hz) | pending | | | |
+| 3 | + 60 Hz display (was 120 Hz) | 38.1 °C (only 8.4 min, started at 35.8 °C) | status 1 | ~1,370 | 14.8 (avg 58.8 fps; under 55 fps 13% of the time, from 56% / 38%) |
 
 The waste is removed; at 60 fps the GPU still needs ~16 of 16.7 ms in real play, so savings went into smoother frames (time under 55 fps 56% → 38%) rather than lower temperature. The 120 Hz panel (found via the user's refresh-rate overlay) is the remaining no-look-change saving; session 3 measures it. If still too warm, the trade-off options (user's choice): key lights' shadow budget, cheaper shadow method for the backroom light, `render_scale` below 1, a 45 fps cap.
 
@@ -61,8 +61,10 @@ The waste is removed; at 60 fps the GPU still needs ~16 of 16.7 ms in real play,
 
 **How the phone sessions work:** the user plays unplugged and plugs back in right after; `.work/heatplay.sh` (background, read-only) logs live temperatures from `dumpsys thermalservice` ("Current temperatures from HAL" section) every 30 s; pull `/sdcard/Android/data/com.godot.game/files/telemetry/` afterwards. Always `adb -s R5CY54G6DWF`. "Stay awake" is on (the user enabled it). The user allows launching/stopping the test app via adb, never taps.
 
+**Open bug: flicker on fading objects (user report, still present in session 3).** Objects that disappear or turn transparent flicker at random moments: the life/charge counter display, ejected shells landing on the table. It existed before today. It is NOT the transparency fallback: the fallback is off on Forward+ and the flicker remains. Candidates to test next: (a) the zero-energy shadow skip in `render_settings.gd`, which toggles `shadow_enabled` whenever a light's energy crosses zero (flickering lights near those objects); (b) the game's own fades rendering badly on Forward+/Adreno (transparent sorting or depth prepass); (c) the shadow-update budget (deferred shadows; but the bug predates it); (d) whether it also happens on the PC with the same build. Plan: ask the user for a short screen recording (they start it themselves) or make a test-driver script that watches the counter display; toggle (a)-(c) one at a time via settings.
+
 **Next steps:**
-1. Session 3 heat result (60 Hz). Then decide with the user whether to try trade-offs.
+1. Find and fix the flicker (see above). Then a full-length (15-20 min) heat session with 60 Hz from a cool start, and decide with the user about trade-offs.
 2. Phase 4 controls: confirm-before-shoot, hit areas, back button, controller glyphs, haptics, and the on-screen controller from the user's touch-controls kit.
 3. Phase 6 launcher with the user's UI kit (needs the license decision: MIT vs GPL-3.0).
 4. On-device texture conversion (needs the etcpak compressor enabled in our engine build).
