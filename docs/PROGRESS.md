@@ -3,7 +3,7 @@
 Running log of where the port stands. Newest status first; the dated log at the bottom keeps the history.
 Every behaviour change to the game is also listed, with its reason, in [CHANGELOG.md](../CHANGELOG.md).
 
-## Status (2026-11-22)
+## Status (2026-11-23)
 
 | Phase | State | Notes |
 |---|---|---|
@@ -12,8 +12,8 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 | 2b. Manual Android test build | Done | Runs on a Galaxy S24 Ultra (Snapdragon 8 Gen 3, Android 16) with ETC2 textures and Forward+. Look matches the PC, including the dealer's face. |
 | 3. Platform stubbing | Started | Steam stub, local achievements, offline leaderboard and the multiplayer lock are in. Platform/Multiplayer interfaces and MULTIPLAYER_NOTES.md still to do. |
 | 4. Input | Started | Touch adapter is in. Confirm-before-shoot, bigger hit areas, back button, glyphs and haptics still to do. |
-| 5. Rendering and performance | In progress | Forward+ on capable phones; ETC2 transcoding (PC reference); shadow optimizer: 60–71 fps on the S24 Ultra; 60 fps cap. Still to do: presets, auto-detect, shader warm-up, low/mid-range devices, on-device transcoding. |
-| 6. Launcher | Not started | Will use the user's launcher UI kit (native Java views). |
+| 5. Rendering and performance | In progress | Forward+ on Android; ETC2 transcoding (PC reference); shadow optimizer (mixed), blinker fix, 16-slot shadow atlas, engine shadow-update budget, 60 Hz display request, 60 fps cap; settings render_scale, shadow_softness, shadow_resolution, idle_fps (off by default). Still to do: presets with auto-detect, shader warm-up, low/mid-range devices, on-device transcoding. |
+| 6. Launcher | Not started | Will use the user's launcher UI kit and touch-controls kit (both native Java, GPL-3.0). The Android engine build it needs now works. |
 | 7. Verification | Not started | |
 
 ## Decisions
@@ -25,6 +25,9 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 | Android renderer | Forward+ (same as the PC) on capable phones | Claude, after the user's visual reports | Compatibility loses colour adjustments and glow. Mobile looked identical on the PC, but on the Adreno 750 it drops the shadows on the dealer's face. Forward+ on the phone matches the PC frame for frame. Mobile and Compatibility stay as candidates for weaker phones. |
 | `using_steam` | Left on | Claude | Keeps the Steam edition's content (bathroom CRT leaderboard machine, achievements); the stub answers offline. Turning it off made the game call itself the itch.io edition. |
 | User data folder | `BuckdroidRoulette` (custom user dir) | Claude | Test builds must never read or write the PC game's real saves. |
+| Idle pacing default | Off (setting `idle_fps = 30` turns it on) | User | Only helps on still screens; real play rarely stays still. |
+| Optional settings | 3D resolution (`render_scale`), idle pacing and similar trade-offs are user settings, not forced defaults | User | The user wants to choose look-vs-heat trade-offs themselves. |
+| Own engine build for Android | Yes, Godot 4.1.1 + patches in `engine/patches/` | User | Needed for engine fixes (shadow budget, 60 Hz) and later for on-device texture conversion. |
 | **License** | **Open — needs the user** | — | The UI kit is GPL-3.0-or-later. Either the user relicenses the kit (if they own all of it) and the project is MIT, or the project is GPL-3.0. |
 
 ## Key findings
@@ -40,7 +43,32 @@ Every behaviour change to the game is also listed, with its reason, in [CHANGELO
 - **Textures:** 874 S3TC textures (416 MB). Phones don't report S3TC, so Godot finds no loadable variant and scene loading fails. Needs ETC2 transcoding (dev builds use a software-decode shortcut for now).
 - **Screen:** without immersive mode, Android reserves the status bar and the game draws in a smaller, offset box. Godot 4.1's Android runner turns immersive mode on with the `--use_immersive` argument.
 
-## Where we stopped (2026-11-22, end of day)
+## Where we stopped (2026-11-23)
+
+**State:** the phone (Galaxy S24 Ultra) runs the game on our own patched Godot 4.1.1 Android engine (patches 0001 diagnostic, 0002 shadow-update budget, 0003 60 Hz display request). The look matches the PC. Gameplay works start to finish (user playtests). Everything is committed (latest: see `git log`).
+
+**Heat, real play (unplugged, ~15-20 min, temperature read right after):**
+
+| Session | Build | Skin after | Throttling | Shadow draws / frame | GPU ms / frame (capped) |
+|---|---|---|---|---|---|
+| 1 (morning) | official engine, mixed + blinker + atlas fixes | 38.9 °C | status 1 | ~2,000 | 17.6 |
+| 2 | + our engine with shadow budget | 39.4 °C | status 1 | ~1,420 | 16.2 |
+| 3 | + 60 Hz display (was 120 Hz) | pending | | | |
+
+The waste is removed; at 60 fps the GPU still needs ~16 of 16.7 ms in real play, so savings went into smoother frames (time under 55 fps 56% → 38%) rather than lower temperature. The 120 Hz panel (found via the user's refresh-rate overlay) is the remaining no-look-change saving; session 3 measures it. If still too warm, the trade-off options (user's choice): key lights' shadow budget, cheaper shadow method for the backroom light, `render_scale` below 1, a 45 fps cap.
+
+**Done today:** in-game telemetry logger (`telemetry = on`, CSV in the app's telemetry folder; Android doesn't let the app read temperatures, so temperatures come from `adb` while plugged in); Android SDK/NDK/JDK 17 setup and engine build; shadow-update budget (−11 to −16% GPU on the phone); 60 Hz display request (renderFrameRate 120 → 60); flicker on fading objects fixed (transparency fallback only for the Mobile/Compatibility renderers; Forward+ fades correctly); settings `render_scale`, `transparency_fallback`; idle pacing off by default.
+
+**How the phone sessions work:** the user plays unplugged and plugs back in right after; `.work/heatplay.sh` (background, read-only) logs live temperatures from `dumpsys thermalservice` ("Current temperatures from HAL" section) every 30 s; pull `/sdcard/Android/data/com.godot.game/files/telemetry/` afterwards. Always `adb -s R5CY54G6DWF`. "Stay awake" is on (the user enabled it). The user allows launching/stopping the test app via adb, never taps.
+
+**Next steps:**
+1. Session 3 heat result (60 Hz). Then decide with the user whether to try trade-offs.
+2. Phase 4 controls: confirm-before-shoot, hit areas, back button, controller glyphs, haptics, and the on-screen controller from the user's touch-controls kit.
+3. Phase 6 launcher with the user's UI kit (needs the license decision: MIT vs GPL-3.0).
+4. On-device texture conversion (needs the etcpak compressor enabled in our engine build).
+5. Presets with auto-detect for weaker phones; test on low/mid-range devices.
+
+### Previous end-of-day notes (2026-11-22)
 
 **Heat and performance, Galaxy S24 Ultra, 15 min idle at the table, no idle pacing (unattended runs, `.work/heatab*.sh`):**
 
@@ -113,6 +141,8 @@ Rules learned the hard way:
 - In Git Bash, set `MSYS_NO_PATHCONV=1` for adb and phone paths, but give Python Windows-style paths.
 
 ## Log
+
+- **2026-11-23** Real-play sessions with the in-game telemetry logger. Android SDK/NDK/JDK setup (only the Android SDK License accepted) and our own Android engine build. Engine patches 0002 (shadow-update budget) and 0003 (60 Hz display request). Fixed the fade flicker (fallback off on Forward+). New settings render_scale, transparency_fallback; idle pacing off by default (user). Noted the user's touch-controls kit for the launcher phase.
 
 - **2026-11-22 (second session)** Deterministic frame comparison showed the 32-bit atlas works but the dealer's face still lacked shadows on the Mobile renderer; Forward+ on the phone matches the PC, so Android switched to Forward+. Profiled on the phone: shadows were the whole cost (37 fps → 120 fps without them). Built the shadow optimizer (skip unlit lights, paraboloid fill lights): 60–71 fps with the face intact. 60 fps cap.
 - **2026-11-22 (later)** Phone visuals: found Godot's phone-only quality cuts (vertex shading etc.) and set them to the PC values. Found that the S3TC software decoding washed out colours, and wrote the ETC2 transcoder; colours now match. Found the 16-bit shadow atlas losing shadows on Adreno, and added a runtime 32-bit override (untested). Test driver gained `inspect`, `lights`, `mobile_settings`, `texinfo`, `setall`, `vp`. Rule: compare only deterministic frames.
