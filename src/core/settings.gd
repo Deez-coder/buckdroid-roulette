@@ -18,7 +18,7 @@ extends Node
 signal controls_changed
 
 const DEFAULTS := {
-	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": ""},   # "" = let BuckdroidRender pick the platform default
+	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": ""},   # "" = let BuckdroidRender pick the platform default
 	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00"},
 }
 
@@ -45,8 +45,17 @@ func _ready() -> void:
 	_write_defaults_if_missing()
 	for file in DEFAULTS:
 		_load(file)
+	_apply_engine_settings()
 	_controls_mtime = FileAccess.get_modified_time(_path("controls"))
 	print("[buckdroid] settings from %s: %s" % [config_dir, _values])
+
+
+# Settings the engine reads once when it first draws a shadow, so they must be set here, before the first frame.
+func _apply_engine_settings() -> void:
+	var refresh := get_value("graphics", "shadow_refresh")
+	if refresh.is_valid_int():
+		ProjectSettings.set_setting("rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval", clampi(int(refresh), 1, 8))
+		print("[buckdroid] shadow refresh: big lights every %d frame(s)" % clampi(int(refresh), 1, 8))
 
 
 func get_value(file: String, key: String) -> String:
@@ -88,6 +97,9 @@ fps_counter = off
 idle_fps =
 ; 3D resolution, from 0.5 to 1.0 (1.0 = full). Lower is cooler and faster but softer; menus and text stay sharp.
 render_scale = 1.0
+; How often the big lights redraw their shadows: 1 = every frame (original), 2 or 3 = every 2nd/3rd frame.
+; 3 makes a moving shadow trail by at most 1/30 s and cuts GPU load by about 13% (cooler phone). Empty = automatic (3 on phones).
+shadow_refresh =
 ; Fallback that hides fading objects on renderers that ignore their fade: auto, on or off.
 transparency_fallback = auto
 ; Diagnostics for testers: write performance and temperature logs to the telemetry folder (on or off).
