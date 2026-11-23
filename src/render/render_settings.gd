@@ -78,6 +78,13 @@ func _ready() -> void:
 	var resolution: String = settings.get_value("graphics", "shadow_resolution") if settings else ""
 	if resolution.is_valid_int() and int(resolution) in [1024, 2048, 4096, 8192]:
 		get_tree().root.positional_shadow_atlas_size = int(resolution)
+	# mesh_detail (1.0 = original): Godot's mesh LOD threshold in pixels. Higher uses simpler versions of distant or
+	# small meshes, in the picture and in shadows. Measured at the table: 2.0 together with shadow_resolution 2048 saves
+	# about 3% GPU load; 4.0 visibly changes thin objects such as the overhead cables.
+	var detail: String = settings.get_value("graphics", "mesh_detail") if settings else ""
+	if detail.is_valid_float():
+		get_tree().root.mesh_lod_threshold = clampf(float(detail), 0.5, 8.0)
+		print("[buckdroid] mesh detail threshold %.1f" % get_tree().root.mesh_lod_threshold)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bd-shadow-mode="):
 			shadow_mode = arg.trim_prefix("--bd-shadow-mode=")

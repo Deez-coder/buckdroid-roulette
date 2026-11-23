@@ -18,7 +18,7 @@ extends Node
 signal controls_changed
 
 const DEFAULTS := {
-	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": ""},   # "" = let BuckdroidRender pick the platform default
+	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": ""},   # "" = let BuckdroidRender pick the platform default
 	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00"},
 }
 
@@ -100,6 +100,12 @@ render_scale = 1.0
 ; How often the big lights redraw their shadows: 1 = every frame (original), 2 or 3 = every 2nd/3rd frame.
 ; 3 makes a moving shadow trail by at most 1/30 s and cuts GPU load by about 13% (cooler phone). Empty = automatic (3 on phones).
 shadow_refresh =
+; Shadow map size: 4096 (original), 2048 or 1024. Smaller saves a little GPU work; shadow edges get slightly coarser.
+shadow_resolution =
+; Shadow edge softness: 0 (hard) to 5 (softest); empty = original (2). 0 saves about 11% GPU load but edges look harder.
+shadow_softness =
+; Mesh detail: 1.0 (original). Higher (e.g. 2.0) uses simpler versions of small or distant objects; saves a few percent.
+mesh_detail =
 ; Fallback that hides fading objects on renderers that ignore their fade: auto, on or off.
 transparency_fallback = auto
 ; Diagnostics for testers: write performance and temperature logs to the telemetry folder (on or off).
