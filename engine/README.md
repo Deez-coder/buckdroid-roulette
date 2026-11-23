@@ -15,6 +15,7 @@ git -C engine/godot apply ../patches/*.patch
 
 | Patch | What it does | Shipped? |
 |---|---|---|
+| `0003-android-preferred-refresh-rate.patch` | Android: requests the refresh rate in `display/window/buckdroid_preferred_refresh_rate` (default 0 = system; the Android overrides set 60) for the game's surface via `Surface.setFrameRate` (Android 11+). On the S24 Ultra the panel drops from 120 to 60 Hz while the game runs. | Yes |
 | `0002-shadow-update-budget.patch` | Shadow-update budget: omni lights with dual-paraboloid shadows (the port's weaker fill lights) redraw a changed shadow at most once every N frames (`rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval`, default 1 = Godot's behaviour; the Android overrides set 3). Pending changes are kept and drawn later; cube-shadow (key) lights are never delayed. PC: shadow draws while moving the shotgun 2,284 → about 1,550 per frame. Phone (S24 Ultra, uncapped): GPU 11.1 → 9.3 ms idle, 12.1 → 10.5 ms grabbing the shotgun. | Yes |
 | `0001-debug-shadow-dirty-log.patch` | Development diagnostic: with the `BUCKDROID_SHADOW_DEBUG` environment variable set, logs which instances mark positional light shadows dirty and which lights actually redraw their shadow. | Dev builds only |
 

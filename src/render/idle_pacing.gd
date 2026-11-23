@@ -7,13 +7,13 @@
 ##
 ## Idle = no input and the camera hasn't moved or turned for IDLE_AFTER seconds. Then the cap drops to IDLE_FPS.
 ## Any input (touch, mouse, controller, key) or camera movement restores the normal cap in the same frame.
-## graphics.ini: idle_fps = 30 | 0 (0 turns this off). Default 30 on Android, off on desktop.
+## graphics.ini: idle_fps = 30 | 0 (0 turns this off). Off by default everywhere (user decision 2026-11-23).
 extends Node
 
 const IDLE_AFTER := 2.0          # seconds without input or camera movement
 const CAMERA_EPSILON := 0.0005   # movement (units / radians) per frame that still counts as still
 
-var idle_fps := 30 if OS.get_name() == "Android" else 0
+var idle_fps := 0                 # off by default (user decision 2026-11-23); graphics.ini idle_fps = 30 turns it on
 var _active_cap := -1            # the normal cap (from BuckdroidRender / settings), restored on activity
 var _still_for := 0.0
 var _idle := false

@@ -66,6 +66,15 @@ func _ready() -> void:
 	if softness.is_valid_int():
 		RenderingServer.positional_soft_shadow_filter_set_quality(clampi(int(softness), 0, 5))
 		RenderingServer.directional_soft_shadow_filter_set_quality(clampi(int(softness), 0, 5))
+	# render_scale (0.5 - 1.0, default 1.0): resolution of the 3D scene relative to the game's own 960x540. Below 1 the
+	# 3D picture is drawn smaller and stretched (bilinear); the game's 2D menus and text stay at full resolution.
+	# Saves GPU time roughly in proportion to the pixels (measured: 70% saved about 1.9 ms at the table).
+	var scale_text: String = settings.get_value("graphics", "render_scale") if settings else ""
+	if scale_text.is_valid_float():
+		var scale := clampf(float(scale_text), 0.5, 1.0)
+		get_tree().root.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		get_tree().root.scaling_3d_scale = scale
+		print("[buckdroid] 3D render scale %.2f" % scale)
 	var resolution: String = settings.get_value("graphics", "shadow_resolution") if settings else ""
 	if resolution.is_valid_int() and int(resolution) in [1024, 2048, 4096, 8192]:
 		get_tree().root.positional_shadow_atlas_size = int(resolution)

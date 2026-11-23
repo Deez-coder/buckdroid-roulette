@@ -7,17 +7,33 @@
 ## This autoload finds every object whose transparency is driven by an AnimationPlayer (in each scene, and in
 ## anything instanced later) and hides it while it is fully transparent. The game's own visibility changes are
 ## respected: an object is only ever shown again by us if we were the ones who hid it.
-## Active on Android by default; "--bd-transparency-fallback" turns it on elsewhere for testing.
+## graphics.ini: transparency_fallback = auto | on | off. "auto" (default) turns it on only on Android with the
+## Mobile or Compatibility renderer; Forward+ handles animated transparency itself, and this fallback can flicker
+## (an animation may set the transparency after this check in the same frame, so a fading object can show fully
+## opaque for one frame). "--bd-transparency-fallback" forces it on for testing.
 extends Node
 
 const OPAQUE_LIMIT := 0.999   # transparency at or above this counts as invisible
 
-var enabled := OS.get_name() == "Android" or OS.get_cmdline_user_args().has("--bd-transparency-fallback")
+var enabled := false
 var _targets: Array[GeometryInstance3D] = []
 var _hidden_by_us := {}       # instance id -> true
 
 
 func _ready() -> void:
+	var settings := get_node_or_null(^"/root/BuckdroidSettings")
+	var mode: String = settings.get_value("graphics", "transparency_fallback") if settings else ""
+	var renderer: String = ProjectSettings.get_setting("rendering/renderer/rendering_method", "")
+	match mode:
+		"on":
+			enabled = true
+		"off":
+			enabled = false
+		_:
+			enabled = OS.get_name() == "Android" and renderer != "forward_plus"
+	if OS.get_cmdline_user_args().has("--bd-transparency-fallback"):
+		enabled = true
+	print("[buckdroid] transparency fallback: %s (setting %s, renderer %s)" % [enabled, mode if mode else "auto", renderer])
 	if not enabled:
 		set_process(false)
 		return

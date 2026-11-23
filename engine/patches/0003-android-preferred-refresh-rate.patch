@@ -1,0 +1,53 @@
+diff --git a/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt b/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt
+index 3828004..9c0c87d 100644
+--- a/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt
++++ b/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt
+@@ -122,9 +122,35 @@ open internal class VkSurfaceView(context: Context) : SurfaceView(context), Surf
+ 	}
+ 
+ 	override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
++		applyPreferredFrameRate(holder)
+ 		vkThread.onSurfaceChanged(width, height)
+ 	}
+ 
++	/**
++	 * Buckdroid: tells Android which refresh rate the game's content needs (project setting
++	 * display/window/buckdroid_preferred_refresh_rate, 0 = leave it to the system). Without this, phones with
++	 * 120 Hz screens keep the panel and compositor at 120 Hz although the game draws 60 frames per second, which
++	 * costs power and heat. Android 11 (API 30) and newer; ignored elsewhere.
++	 */
++	private fun applyPreferredFrameRate(holder: SurfaceHolder) {
++		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
++			return
++		}
++		val rate = try {
++			org.godotengine.godot.GodotLib.getGlobal("display/window/buckdroid_preferred_refresh_rate").toFloat()
++		} catch (e: Exception) {
++			0f
++		}
++		if (rate > 0f) {
++			try {
++				holder.surface.setFrameRate(rate, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
++				android.util.Log.i("godot", "[buckdroid] requested display refresh rate $rate Hz")
++			} catch (e: Exception) {
++				android.util.Log.w("godot", "[buckdroid] setFrameRate failed: $e")
++			}
++		}
++	}
++
+ 	override fun surfaceDestroyed(holder: SurfaceHolder) {
+ 		vkThread.onSurfaceDestroyed()
+ 	}
+diff --git a/servers/rendering_server.cpp b/servers/rendering_server.cpp
+index e3d0d32..fe864f3 100644
+--- a/servers/rendering_server.cpp
++++ b/servers/rendering_server.cpp
+@@ -2893,6 +2893,8 @@ void RenderingServer::init() {
+ 	GLOBAL_DEF("rendering/lights_and_shadows/directional_shadow/16_bits", true);
+ 
+ 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality", PROPERTY_HINT_ENUM, "Hard (Fastest),Soft Very Low (Faster),Soft Low (Fast),Soft Medium (Average),Soft High (Slow),Soft Ultra (Slowest)"), 2);
++	// Buckdroid: display refresh rate requested from Android for the game's surface (0 = system default).
++	GLOBAL_DEF(PropertyInfo(Variant::INT, "display/window/buckdroid_preferred_refresh_rate", PROPERTY_HINT_RANGE, "0,240,1"), 0);
+ 	// Buckdroid: shadow-update budget for dual-paraboloid omni lights (1 = every frame, Godot's behaviour).
+ 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval", PROPERTY_HINT_RANGE, "1,8,1"), 1);
+ 	GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality.mobile", 0);
