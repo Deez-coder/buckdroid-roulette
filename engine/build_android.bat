@@ -14,4 +14,4 @@ if "%1"=="release" set "TARGET=template_release"
 cd /d "%~dp0godot"
 python -m SCons platform=android target=%TARGET% arch=arm64 -j12 || exit /b 1
 cd platform\android\java
-call gradlew.bat generateGodotTemplates || exit /b 1
+call .\gradlew.bat generateGodotTemplates || exit /b 1

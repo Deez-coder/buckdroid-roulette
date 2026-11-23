@@ -1,0 +1,50 @@
+From 997e3422cc4d236e8d050cf3600def21c550946f Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Mon, 23 Nov 2026 17:42:40 +0300
+Subject: [PATCH] Buckdroid 0005: separate scene-data buffers for transparent
+ and shadow passes
+
+---
+ .../forward_clustered/render_forward_clustered.cpp   | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp b/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp
+index ce0b4a9..08065b6 100644
+--- a/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp
++++ b/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp
+@@ -2056,9 +2056,11 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
+ 
+ 	RD::get_singleton()->draw_command_begin_label("Render 3D Transparent Pass");
+ 
+-	rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_ALPHA, p_render_data, radiance_texture, true);
+-
+-	_setup_environment(p_render_data, is_reflection_probe, screen_size, !is_reflection_probe, p_default_bg_color, false);
++	// Buckdroid: the transparent pass gets its own scene-data buffer (slot 1) instead of rewriting slot 0 between the
++	// opaque and transparent passes; shadow passes use slots 2+. Sharing slot 0 made every transparent object vanish
++	// for single frames on Adreno when shadow redraws were mixed (Buckdroid engine patch 0005).
++	_setup_environment(p_render_data, is_reflection_probe, screen_size, !is_reflection_probe, p_default_bg_color, false, false, 1);
++	rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_ALPHA, p_render_data, radiance_texture, true, 1);
+ 
+ 	{
+ 		uint32_t transparent_color_pass_flags = (color_pass_flags | COLOR_PASS_FLAG_TRANSPARENT) & ~(COLOR_PASS_FLAG_SEPARATE_SPECULAR);
+@@ -2365,7 +2367,7 @@ void RenderForwardClustered::_render_shadow_append(RID p_framebuffer, const Page
+ 	render_data.instances = &p_instances;
+ 	render_data.render_info = p_render_info;
+ 
+-	_setup_environment(&render_data, true, Vector2(1, 1), !p_flip_y, Color(), false, p_use_pancake, shadow_pass_index);
++	_setup_environment(&render_data, true, Vector2(1, 1), !p_flip_y, Color(), false, p_use_pancake, shadow_pass_index + 2); // Buckdroid: slots 0/1 belong to the main passes
+ 
+ 	if (get_debug_draw_mode() == RS::VIEWPORT_DEBUG_DRAW_DISABLE_LOD) {
+ 		scene_data.screen_mesh_lod_threshold = 0.0;
+@@ -2418,7 +2420,7 @@ void RenderForwardClustered::_render_shadow_process() {
+ 	for (uint32_t i = 0; i < scene_state.shadow_passes.size(); i++) {
+ 		//render passes need to be configured after instance buffer is done, since they need the latest version
+ 		SceneState::ShadowPass &shadow_pass = scene_state.shadow_passes[i];
+-		shadow_pass.rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), false, i);
++		shadow_pass.rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), false, i + 2); // Buckdroid: see _setup_environment slot
+ 	}
+ 
+ 	RD::get_singleton()->draw_command_end_label();
+-- 
+2.53.0.windows.2
+

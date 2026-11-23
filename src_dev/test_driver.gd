@@ -313,6 +313,46 @@ func _run() -> void:
 						_log("watchall %d hitch %.0f ms" % [now_ms, (us - last_us) / 1000.0])
 					last_us = us
 				_log("watchall done")
+			"unshade":  # unshade <name substring, _ for spaces>: matching meshes get unshaded copies of their materials,
+				# matching Label3Ds are logged and set unshaded (tells lighting/shadow faults from objects being skipped)
+				var un := p[1].replace("_", " ").to_lower()
+				var count := 0
+				for g in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
+					if not str(g.get_path()).to_lower().contains(un):
+						continue
+					if g is Label3D:
+						_log("unshade label %s shaded=%s" % [g.name, g.shaded])
+						g.shaded = false
+						count += 1
+					elif g is MeshInstance3D and g.mesh:
+						for s in g.mesh.get_surface_count():
+							var m = g.get_active_material(s)
+							if m is BaseMaterial3D:
+								var m2: BaseMaterial3D = m.duplicate()
+								m2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+								g.set_surface_override_material(s, m2)
+						count += 1
+				_log("unshade %s: %d objects" % [un, count])
+			"flipdemo":  # flipdemo <times>: camera on the health display, then turns the shell tray open and shut <times>
+				# times (the game's own "show shells"/"hide shells"), to reproduce the one-frame vanish of transparent objects
+				var sp: Node = null
+				for n in get_tree().current_scene.find_children("*", "Node", true, false):
+					var scr: Script = n.get_script()
+					if scr and scr.resource_path.ends_with("/ShellSpawner.gd"):
+						sp = n
+						break
+				if sp == null:
+					_log("flipdemo: no ShellSpawner")
+				else:
+					sp.camera.BeginLerp("health counter")
+					await get_tree().create_timer(2.0).timeout
+					_log("flipdemo start unix_ms=%d" % int(Time.get_unix_time_from_system() * 1000.0))
+					for k in int(p[1]):
+						sp.anim_compartment.play("show shells")
+						await get_tree().create_timer(0.8).timeout
+						sp.anim_compartment.play("hide shells")
+						await get_tree().create_timer(0.8).timeout
+					_log("flipdemo done")
 			"watchrender":  # watchrender <seconds>: per frame, the renderer's own counts for the main view (objects,
 				# draw calls, primitives). Logs every frame while the shell compartment turns (round start), plus any
 				# one-frame dip anywhere, to tell objects dropped by culling (counts dip) from GPU-side drops.
