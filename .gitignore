@@ -22,6 +22,7 @@ project.binary
 # Build outputs
 /build/
 /engine/godot/
+/engine/godot46/
 /engine/out/
 *.apk
 *.aab
