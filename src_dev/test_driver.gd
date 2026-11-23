@@ -45,7 +45,11 @@ func _run() -> void:
 		if not raw.split("#")[0].strip_edges().is_empty():
 			has_steps = true
 	var touch := get_node_or_null(^"/root/BuckdroidTouch")
-	if has_steps and touch:
+	var keep_touch := false
+	for raw in _steps:
+		if raw.strip_edges() == "keep_touch":   # the user plays; leave their touch mode alone
+			keep_touch = true
+	if has_steps and touch and not keep_touch:
 		touch.mode = "direct"
 		_log("touch mode forced to direct for this test")
 	for raw in _steps:
@@ -278,6 +282,66 @@ func _run() -> void:
 							vis += 1
 					_log("burst %d frame %d visible_matching=%d" % [f, Engine.get_process_frames(), vis])
 				_log("burst done")
+			"watchall":  # watchall <seconds>: while the user plays, log every frame where any mesh's visibility toggles or
+				# its transparency jumps by more than 0.5 in one frame, plus frame hitches, with wall-clock milliseconds
+				# so a screen recording can be lined up. Rescans the scene once a second (objects come and go).
+				var deadline := Time.get_ticks_msec() + int(float(p[1]) * 1000.0)
+				var states := {}
+				var nodes: Array = []
+				var rescan_at := 0
+				var last_us := Time.get_ticks_usec()
+				_log("watchall start unix_ms=%d" % int(Time.get_unix_time_from_system() * 1000.0))
+				while Time.get_ticks_msec() < deadline:
+					if Time.get_ticks_msec() >= rescan_at:
+						nodes = get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false)
+						rescan_at = Time.get_ticks_msec() + 1000
+					var now_ms := int(Time.get_unix_time_from_system() * 1000.0)
+					for g in nodes:
+						if not is_instance_valid(g):
+							continue
+						var key: int = g.get_instance_id()
+						var v: bool = g.is_visible_in_tree()
+						var tr: float = g.transparency
+						if states.has(key):
+							var old: Array = states[key]
+							if old[0] != v or absf(old[1] - tr) > 0.5:
+								_log("watchall %d %s vis %s->%s tr %.2f->%.2f" % [now_ms, g.name, old[0], v, old[1], tr])
+						states[key] = [v, tr]
+					await get_tree().process_frame
+					var us := Time.get_ticks_usec()
+					if us - last_us > 50000:
+						_log("watchall %d hitch %.0f ms" % [now_ms, (us - last_us) / 1000.0])
+					last_us = us
+				_log("watchall done")
+			"watchrender":  # watchrender <seconds>: per frame, the renderer's own counts for the main view (objects,
+				# draw calls, primitives). Logs every frame while the shell compartment turns (round start), plus any
+				# one-frame dip anywhere, to tell objects dropped by culling (counts dip) from GPU-side drops.
+				var deadline := Time.get_ticks_msec() + int(float(p[1]) * 1000.0)
+				var vp_rid := get_viewport().get_viewport_rid()
+				var comp: Node3D = get_tree().current_scene.find_child("compartment_shells", true, false)
+				var hist := []  # [frame, objects, draws, prims, rot]
+				var rest_rot := 0.0
+				var moving_until := 0
+				_log("watchrender start compartment=%s" % (comp.get_path() if comp else "none"))
+				while Time.get_ticks_msec() < deadline:
+					await RenderingServer.frame_post_draw
+					var T := RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE
+					var o := RenderingServer.viewport_get_render_info(vp_rid, T, RenderingServer.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME)
+					var d := RenderingServer.viewport_get_render_info(vp_rid, T, RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME)
+					var pr := RenderingServer.viewport_get_render_info(vp_rid, T, RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME)
+					var rot := comp.rotation.z if comp else 0.0
+					var f := Engine.get_frames_drawn()
+					hist.append([f, o, d, pr, rot])
+					if hist.size() > 3:
+						hist.pop_front()
+					if absf(rot - rest_rot) > 0.001:
+						moving_until = f + 3
+						rest_rot = rot
+					if f <= moving_until:
+						_log("watchrender %d obj=%d draws=%d prims=%d rot=%.3f" % [f, o, d, pr, rot])
+					elif hist.size() == 3 and hist[1][1] < hist[0][1] - 2 and hist[1][1] < hist[2][1] - 2:
+						_log("watchrender dip %s" % [hist])
+				_log("watchrender done")
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])
@@ -382,6 +446,8 @@ func _run() -> void:
 			"vp":  # vp <viewport property> <value>
 				get_viewport().set(p[1], str_to_var(p[2]))
 				_log("viewport %s = %s" % [p[1], get_viewport().get(p[1])])
+			"keep_touch":
+				pass
 			"quit":
 				_log("done")
 				get_tree().quit()
