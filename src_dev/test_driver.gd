@@ -313,6 +313,16 @@ func _run() -> void:
 						_log("watchall %d hitch %.0f ms" % [now_ms, (us - last_us) / 1000.0])
 					last_us = us
 				_log("watchall done")
+			"vsync":  # vsync <on|off>: off lets the frame rate run free, so GPU time reflects the real work (with vsync at
+				# 60 Hz the phone lowers its GPU clock and GPU time per frame reads flat)
+				DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if p[1] == "on" else DisplayServer.VSYNC_DISABLED)
+				_log("vsync " + p[1])
+			"nodeprocess":  # nodeprocess <autoload name> <true|false>: pause an autoload's per-frame work (e.g. the shadow
+				# optimizer, which would otherwise switch shadows back on during an experiment)
+				var nd := get_node_or_null(NodePath("/root/" + p[1]))
+				if nd:
+					nd.set_process(p[2] == "true")
+				_log("process %s = %s" % [p[1], p[2]])
 			"unshade":  # unshade <name substring, _ for spaces>: matching meshes get unshaded copies of their materials,
 				# matching Label3Ds are logged and set unshaded (tells lighting/shadow faults from objects being skipped)
 				var un := p[1].replace("_", " ").to_lower()
