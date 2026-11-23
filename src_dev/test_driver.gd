@@ -237,6 +237,47 @@ func _run() -> void:
 			"quadsub":  # quadsub <quadrant 0-3> <subdiv enum 0-6>: shadow atlas slots per quadrant (2 = 4 slots, 3 = 16, 4 = 64)
 				get_viewport().set_positional_shadow_atlas_quadrant_subdiv(int(p[1]), int(p[2]))
 				_log("shadow atlas quadrant %s subdiv = %s" % [p[1], p[2]])
+			"watch":  # watch <name substring, _ for spaces> <frames>: log every frame where a matching mesh's visible or
+				# transparency changes (for one-frame flicker hunts)
+				var wn := p[1].replace("_", " ").to_lower()
+				var nodes := []
+				for g in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
+					if String(g.name).to_lower().contains(wn) or str(g.get_path()).to_lower().contains(wn):
+						nodes.append(g)
+				var last := {}
+				_log("watch: %d nodes matching '%s'" % [nodes.size(), wn])
+				for f in int(p[2]):
+					for g in nodes:
+						if not is_instance_valid(g):
+							continue
+						var state := "vis=%s tr=%.2f" % [g.is_visible_in_tree(), g.transparency]
+						var key: int = g.get_instance_id()
+						if last.get(key, "") != state:
+							if last.has(key):
+								_log("watch frame %d %s: %s -> %s" % [Engine.get_process_frames(), g.name, last[key], state])
+							last[key] = state
+					await get_tree().process_frame
+				_log("watch done")
+			"burst":  # burst <frames> <name substring>: save every rendered frame (small JPG) and log the scene state of
+				# matching meshes each frame, to tell rendering glitches from the game actually hiding things
+				var bn := p[2].replace("_", " ").to_lower()
+				var bnodes := []
+				for g in get_tree().current_scene.find_children("*", "GeometryInstance3D", true, false):
+					if str(g.get_path()).to_lower().contains(bn):
+						bnodes.append(g)
+				var bdir := _out.path_join("burst")
+				DirAccess.make_dir_recursive_absolute(bdir)
+				for f in int(p[1]):
+					await RenderingServer.frame_post_draw
+					var img := get_viewport().get_texture().get_image()
+					img.resize(480, 270, Image.INTERPOLATE_BILINEAR)
+					img.save_jpg(bdir.path_join("f%04d.jpg" % f), 0.85)
+					var vis := 0
+					for g in bnodes:
+						if is_instance_valid(g) and g.is_visible_in_tree() and g.transparency < 0.99:
+							vis += 1
+					_log("burst %d frame %d visible_matching=%d" % [f, Engine.get_process_frames(), vis])
+				_log("burst done")
 			"fpscap":  # fpscap <n>: frame rate limit for this run (0 = none). With a cap the phone lowers its GPU clock,
 				# so GPU time per frame stops reflecting the amount of work; measure costs uncapped.
 				Engine.max_fps = int(p[1])

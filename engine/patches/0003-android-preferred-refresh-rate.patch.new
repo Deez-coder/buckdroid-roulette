@@ -1,0 +1,49 @@
+diff --git a/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt b/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt
+index 9c0c87d..ec0c054 100644
+--- a/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt
++++ b/platform/android/java/lib/src/org/godotengine/godot/vulkan/VkSurfaceView.kt
+@@ -143,11 +143,43 @@ open internal class VkSurfaceView(context: Context) : SurfaceView(context), Surf
+ 		}
+ 		if (rate > 0f) {
+ 			try {
+-				holder.surface.setFrameRate(rate, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
++				if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
++					// "Always" switch to this rate, even if the change isn't seamless (Android 12+).
++					holder.surface.setFrameRate(rate, android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
++							android.view.Surface.CHANGE_FRAME_RATE_ALWAYS)
++				} else {
++					holder.surface.setFrameRate(rate, android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
++				}
+ 				android.util.Log.i("godot", "[buckdroid] requested display refresh rate $rate Hz")
+ 			} catch (e: Exception) {
+ 				android.util.Log.w("godot", "[buckdroid] setFrameRate failed: $e")
+ 			}
++			disableTouchBoost()
++		}
++	}
++
++	/**
++	 * Buckdroid: Android raises the refresh rate to the maximum on every touch ("touch boost"), which overrides the
++	 * game's 60 Hz request on Samsung phones; the user saw the panel go back to 120 Hz during play. Android 15
++	 * (API 35) lets a window opt out. Called through reflection because Godot 4.1 compiles against API 33.
++	 */
++	private fun disableTouchBoost() {
++		if (android.os.Build.VERSION.SDK_INT < 35) {
++			return
++		}
++		val activity = context as? android.app.Activity ?: return
++		try {
++			val m = activity.window.javaClass.getMethod("setFrameRateBoostOnTouchEnabled", Boolean::class.javaPrimitiveType)
++			activity.runOnUiThread {
++				try {
++					m.invoke(activity.window, false)
++					android.util.Log.i("godot", "[buckdroid] touch boost off")
++				} catch (e: Exception) {
++					android.util.Log.w("godot", "[buckdroid] touch boost: $e")
++				}
++			}
++		} catch (e: Exception) {
++			android.util.Log.w("godot", "[buckdroid] touch boost not available: $e")
+ 		}
+ 	}
+ 
