@@ -96,6 +96,8 @@ def main():
     ap.add_argument("--dev-s3tc-fallback", action="store_true",
                     help="dev smoke test only: let mobile load the desktop S3TC textures (decoded in software)")
     ap.add_argument("--skip-version-check", action="store_true", help="development only")
+    ap.add_argument("--dev-newer-engine", action="store_true",
+                    help="dev experiment: adapt the data for a newer Godot 4.x engine (global class list format)")
     a = ap.parse_args()
 
     t0 = time.time()
@@ -176,6 +178,22 @@ def main():
                 replaced[e.path] = add_etc2_remap(raw, etc2)
             added += 1
         print(f"etc2: {added} textures " + ("written in place of the S3TC data" if a.android else "added"))
+    if a.dev_newer_engine:
+        # Godot 4.4+ expects "is_abstract" and "is_tool" in every entry of the global class list; without them the
+        # game's class_name types are unknown and most scripts fail to parse.
+        key = "res://.godot/global_script_class_cache.cfg"
+        text = pck.read(key).decode("utf-8")
+        text = text.replace('"icon": "",', '"icon": "",' + chr(10) + '"is_abstract": false,' + chr(10) + '"is_tool": false,')
+        replaced[key] = text.encode("utf-8")
+        # Godot 4.2+ rejects Node-typed @export in a Resource script (4.1 accepted it); the multiplayer-only item
+        # resource has four. Dropping the @export keeps the variables; their values are assigned in code.
+        key = "res://multiplayer/scripts/user scripts/MP_ItemResource_User.gd"
+        src = pck.read(key).decode("utf-8")
+        for side in ("R", "L"):
+            for part in ("hand", "mesh"):
+                src = src.replace(f"@export var {side}_assigned_{part} : Node3D", f"var {side}_assigned_{part} : Node3D")
+        replaced[key] = src.encode("utf-8")
+        print("newer engine: global class list adapted, 4 Node exports in a Resource script relaxed (dev)")
     if a.dev_s3tc_fallback and not a.etc2_dir:
         for e in pck.entries:
             if e.path.endswith(".import"):
