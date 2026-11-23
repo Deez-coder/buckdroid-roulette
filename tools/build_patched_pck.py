@@ -87,6 +87,8 @@ def main():
     ap.add_argument("--android", action="store_true", help="apply the Android settings overrides")
     ap.add_argument("--full-hash", action="store_true", help="also check the SHA-256 of the whole PCK")
     ap.add_argument("--dev", action="store_true", help="add the dev-only test driver (src_dev/); never for users")
+    ap.add_argument("--dev-set", action="append", default=[], metavar="KEY=VALUE",
+                    help="dev experiments only: set a project setting (int, float, true/false or text)")
     ap.add_argument("--dev-renderer", choices=["forward_plus", "mobile", "gl_compatibility"],
                     help="dev experiments only: force a renderer on every platform")
     ap.add_argument("--etc2-dir", help="folder written by tools/transcode_etc2.gd; adds the ETC2 textures, points "
@@ -133,6 +135,15 @@ def main():
     overrides = versions["overrides"]["common"] | (versions["overrides"]["android"] if a.android else {})
     for k, v in overrides.items():
         pb.set(k, v)
+    for kv in a.dev_set:
+        key, _, val = kv.partition("=")
+        v = True if val == "true" else False if val == "false" else int(val) if val.lstrip("-").isdigit() else val
+        try:
+            v = float(val) if not isinstance(v, (bool, int)) and "." in val else v
+        except ValueError:
+            pass
+        pb.set(key, v)
+        print(f"dev setting {key} = {v!r}")
     if a.dev_renderer:
         pb.set("rendering/renderer/rendering_method", a.dev_renderer)
         pb.set("rendering/renderer/rendering_method.mobile", a.dev_renderer)

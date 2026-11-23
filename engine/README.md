@@ -15,9 +15,12 @@ git -C engine/godot apply ../patches/*.patch
 
 | Patch | What it does | Shipped? |
 |---|---|---|
+| `0002-shadow-update-budget.patch` | Shadow-update budget: omni lights with dual-paraboloid shadows (the port's weaker fill lights) redraw a changed shadow at most once every N frames (`rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval`, default 1 = Godot's behaviour; the Android overrides set 3). Pending changes are kept and drawn later; cube-shadow (key) lights are never delayed. PC measurement while moving the shotgun: shadow draws 2,284 → about 1,550 per frame. | Yes |
 | `0001-debug-shadow-dirty-log.patch` | Development diagnostic: with the `BUCKDROID_SHADOW_DEBUG` environment variable set, logs which instances mark positional light shadows dirty and which lights actually redraw their shadow. | Dev builds only |
 
 ## Build
 
 - Windows test runtime: `engine\build_windows.bat` (Visual Studio C++ tools, SCons). Output in `engine/godot/bin/`.
-- Android templates: to be added (Android SDK/NDK r23c, JDK 17).
+- Android SDK: `enginendroid_sdk_setup.bat licenses` then `... install` (JDK 17 and the command-line tools in `.cache/`; accepting means agreeing to Google's Android SDK License).
+- Android templates: to be added.
+- Apply the patches in order (0001, 0002, ...); 0002 is written on top of 0001.
