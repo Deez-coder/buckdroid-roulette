@@ -18,7 +18,7 @@ extends Node
 signal controls_changed
 
 const DEFAULTS := {
-	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": ""},   # "" = let BuckdroidRender pick the platform default
+	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off"},   # "" = let BuckdroidRender pick the platform default
 	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00"},
 }
 
@@ -86,6 +86,8 @@ fps_counter = off
 ; Frame rate while nothing on screen changes (no input, camera still for 2 s): 30, or 0 to turn this off.
 ; Saves heat and battery while you think; any touch or camera movement restores full speed at once. Empty = automatic.
 idle_fps =
+; Diagnostics for testers: write performance and temperature logs to the telemetry folder (on or off).
+telemetry = off
 """,
 	"controls": """; Buckdroid Roulette - touch settings. A missing key means the default.
 ; direct = tap where you want to click; relative = drag to move a cursor like a trackpad, tap to click.

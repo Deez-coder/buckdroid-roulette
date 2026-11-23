@@ -39,6 +39,7 @@ AUTOLOADS = [
     ("BuckdroidRender", "render/render_settings.gd"),
     ("BuckdroidPerfOverlay", "render/perf_overlay.gd"),
     ("BuckdroidIdlePacing", "render/idle_pacing.gd"),
+    ("BuckdroidTelemetry", "core/telemetry.gd"),
 ]
 
 
