@@ -1,0 +1,80 @@
+From 859be2a35389d701c8c60e8b6abef6a8b802e9dc Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 17:39:57 +0300
+Subject: [PATCH 11/11] Buckdroid 46-0007: launcher activity as the app entry
+ point, engine in its own :game process, app label
+
+---
+ platform/android/java/app/build.gradle        |  2 ++
+ .../java/app/src/main/AndroidManifest.xml     | 26 +++++++++++++------
+ 2 files changed, 20 insertions(+), 8 deletions(-)
+
+diff --git a/platform/android/java/app/build.gradle b/platform/android/java/app/build.gradle
+index 839dbb7..783851b 100644
+--- a/platform/android/java/app/build.gradle
++++ b/platform/android/java/app/build.gradle
+@@ -250,6 +250,8 @@ android {
+ 
+     sourceSets {
+         main.res.srcDirs += ['res']
++        // Buckdroid: the launcher (repository folder launcher/java, the user's launcher UI kit plus our activity).
++        main.java.srcDirs += ['../../../../../../launcher/java']
+         debug.jniLibs.srcDirs = ['libs/debug', 'libs/debug/vulkan_validation_layers']
+         dev.jniLibs.srcDirs = ['libs/dev']
+         release.jniLibs.srcDirs = ['libs/release']
+diff --git a/platform/android/java/app/src/main/AndroidManifest.xml b/platform/android/java/app/src/main/AndroidManifest.xml
+index 4177451..00a1ecc 100644
+--- a/platform/android/java/app/src/main/AndroidManifest.xml
++++ b/platform/android/java/app/src/main/AndroidManifest.xml
+@@ -16,7 +16,7 @@
+         android:required="true" />
+ 
+     <application
+-        android:label="@string/godot_project_name_string"
++        android:label="Buckdroid Roulette"
+         android:allowBackup="false"
+         android:icon="@mipmap/icon"
+         android:appCategory="game"
+@@ -29,8 +29,24 @@
+             android:enabled="true"
+             tools:targetApi="29" />
+ 
++        <!-- Buckdroid: the launcher is the app's entry point; the engine runs in its own ":game" process, so leaving
++             the game ends that process and the launcher stays. -->
++        <activity
++            android:name="com.buckdroid.roulette.LauncherActivity"
++            android:label="Buckdroid Roulette"
++            android:exported="true"
++            android:screenOrientation="sensorLandscape"
++            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
++            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
++            <intent-filter>
++                <action android:name="android.intent.action.MAIN" />
++                <category android:name="android.intent.category.LAUNCHER" />
++            </intent-filter>
++        </activity>
++
+         <activity
+             android:name=".GodotApp"
++            android:process=":game"
+             android:theme="@style/GodotAppSplashTheme"
+             android:launchMode="singleInstancePerTask"
+             android:excludeFromRecents="false"
+@@ -43,13 +59,7 @@
+         <activity-alias
+             android:name=".GodotAppLauncher"
+             android:targetActivity=".GodotApp"
+-            android:exported="true">
+-            <intent-filter>
+-                <action android:name="android.intent.action.MAIN" />
+-                <category android:name="android.intent.category.DEFAULT" />
+-                <category android:name="android.intent.category.LAUNCHER" />
+-            </intent-filter>
+-        </activity-alias>
++            android:exported="false" />
+ 
+     </application>
+ 
+-- 
+2.53.0.windows.2
+

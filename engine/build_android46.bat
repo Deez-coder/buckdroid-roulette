@@ -12,4 +12,5 @@ set "PATH=%JAVA_HOME%\bin;%SCONS_DIR%;%PATH%"
 cd /d "%~dp0godot46"
 python -m SCons platform=android target=template_debug arch=arm64 disable_path_overrides=no swappy=yes -j12 || exit /b 1
 cd platform\android\java
-call .\gradlew.bat generateGodotTemplates || exit /b 1
+rem The app's own ID (not com.godot.game), so it never collides with other Godot games.
+call .\gradlew.bat generateGodotTemplates -Pexport_package_name=com.buckdroid.roulette || exit /b 1

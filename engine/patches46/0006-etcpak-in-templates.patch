@@ -1,0 +1,54 @@
+From fa33c4c39c46867d2c5c0641f18f0df194f3e989 Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 17:23:02 +0300
+Subject: [PATCH 10/11] Buckdroid 46-0006: etcpak compression available in
+ export templates (on-device texture conversion)
+
+---
+ modules/etcpak/image_compress_etcpak.cpp | 2 +-
+ modules/etcpak/image_compress_etcpak.h   | 2 +-
+ modules/etcpak/register_types.cpp        | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/modules/etcpak/image_compress_etcpak.cpp b/modules/etcpak/image_compress_etcpak.cpp
+index 1d8c936..38d0d1e 100644
+--- a/modules/etcpak/image_compress_etcpak.cpp
++++ b/modules/etcpak/image_compress_etcpak.cpp
+@@ -30,7 +30,7 @@
+ 
+ #include "image_compress_etcpak.h"
+ 
+-#ifdef TOOLS_ENABLED
++#if 1 // Buckdroid: ETC2 compression in export templates too (the launcher converts textures on the phone)
+ 
+ #include "core/os/os.h"
+ #include "core/string/print_string.h"
+diff --git a/modules/etcpak/image_compress_etcpak.h b/modules/etcpak/image_compress_etcpak.h
+index eb57297..485d133 100644
+--- a/modules/etcpak/image_compress_etcpak.h
++++ b/modules/etcpak/image_compress_etcpak.h
+@@ -30,7 +30,7 @@
+ 
+ #pragma once
+ 
+-#ifdef TOOLS_ENABLED
++#if 1 // Buckdroid: ETC2 compression in export templates too (the launcher converts textures on the phone)
+ 
+ #include "core/io/image.h"
+ 
+diff --git a/modules/etcpak/register_types.cpp b/modules/etcpak/register_types.cpp
+index da0c1e5..4ffaa90 100644
+--- a/modules/etcpak/register_types.cpp
++++ b/modules/etcpak/register_types.cpp
+@@ -38,7 +38,7 @@ void initialize_etcpak_module(ModuleInitializationLevel p_level) {
+ 		return;
+ 	}
+ 
+-#ifdef TOOLS_ENABLED
++#if 1 // Buckdroid: ETC2 compression in export templates too (the launcher converts textures on the phone)
+ 	Image::_image_compress_etc1_func = _compress_etc1;
+ 	Image::_image_compress_etc2_func = _compress_etc2;
+ 	Image::_image_compress_bc_func = _compress_bc;
+-- 
+2.53.0.windows.2
+
