@@ -158,8 +158,9 @@ public class LauncherActivity extends KitActivity {
                 "100% = the game's own picture. Lower is cooler and faster but softer; menus and text stay sharp."));
         p.addView(choice(g, "shadow_resolution", "Shadow detail", new String[]{"4096", "2048", "1024"},
                 new String[]{"Full", "Medium", "Low"}, "4096", "Lower saves a little GPU work; shadow edges get coarser."));
-        p.addView(choice(g, "shadow_softness", "Shadow edges", new String[]{"2", "0"}, new String[]{"Soft (original)", "Hard"}, "2",
-                "Hard edges save about 11% GPU work."));
+        p.addView(choice(g, "shadow_softness", "Shadow edge softness", new String[]{"0", "1", "2", "3", "4", "5"},
+                new String[]{"Hard", "1", "2", "3", "4", "5"}, "2",
+                "2 is the original. Hard edges save about 11% GPU work; higher is softer and costs more."));
         p.addView(choice(g, "shadow_refresh", "Moving shadows", new String[]{"1", "2", "3"},
                 new String[]{"Every frame", "Every 2nd", "Every 3rd"}, "1",
                 "Every frame is the original. Every 3rd saves about 12% GPU work but moving shadows lag a little."));
@@ -176,6 +177,21 @@ public class LauncherActivity extends KitActivity {
         perf.addView(toggle(g, "fps_counter", "Performance overlay", "on", "off", "off",
                 "Frame rate, frame time, memory and heat in the top left corner."));
         content.addView(perf);
+
+        LinearLayout adv = card();
+        adv.addView(header("Advanced"));
+        adv.addView(choice(g, "shadow_mode", "Shadow method", new String[]{"mixed", "cube", "paraboloid"},
+                new String[]{"Balanced", "Exact", "Fast"}, "mixed",
+                "Balanced: the main lights keep exact shadows, weak fill lights use cheaper ones (default). "
+                + "Exact: every light like the PC (heaviest). Fast: all lights use the cheaper method (shading on faces changes)."));
+        adv.addView(choice(g, "idle_fps", "Idle frame rate", new String[]{"0", "30"}, new String[]{"Off", "30 fps"}, "0",
+                "30 fps while nothing on screen changes for 2 seconds; any touch restores full speed."));
+        adv.addView(choice(g, "transparency_fallback", "Fade workaround", new String[]{"auto", "on", "off"},
+                new String[]{"Auto", "On", "Off"}, "auto",
+                "Hides fully faded objects on renderers that ignore fading. Auto: only where needed."));
+        adv.addView(toggle(g, "telemetry", "Performance log", "on", "off", "off",
+                "Writes frame rate, GPU time and heat readings every 5 seconds to the app's telemetry folder, for testing."));
+        content.addView(adv);
         content.addView(note("Changes apply the next time the game starts."));
     }
 

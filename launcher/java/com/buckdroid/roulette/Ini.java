@@ -35,8 +35,12 @@ public class Ini {
         if (t.startsWith(";") || t.startsWith("#") || !t.contains("=")) return null;
         return t.substring(0, t.indexOf('=')).trim();
     }
+    /* Buckdroid: an empty value ("fps_cap =") means "automatic" in our files, so it reads as the default too. */
     public String get(String key, String def) {
-        for (String s : lines()) if (key.equalsIgnoreCase(keyOf(s))) return s.substring(s.indexOf('=') + 1).trim();
+        for (String s : lines()) if (key.equalsIgnoreCase(keyOf(s))) {
+            String v = s.substring(s.indexOf('=') + 1).trim();
+            return v.isEmpty() ? def : v;
+        }
         return def;
     }
     public void set(String key, String value) {
