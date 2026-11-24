@@ -281,3 +281,10 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   it rewrites game.pck with the new res://buckdroid/* files, autoload list and extension list, copying every game file
   unchanged (no texture conversion, no game file needed), with the usual progress bar. The home-screen shortcut goes
   through the launcher in that case. Built, not yet run on the phone (disconnected).
+- 2026-11-25, nickname (*choice*): multiplayer.ini (nickname, chat on/off; values keep their case), launcher Game tab
+  "Multiplayer" card (name box, chat switch, privacy note). Checked on the PC: the name reaches BuckdroidNet.
+  Chat UI deliberately not built while the user was away: touches on a chat box would also reach the game's own
+  input handling (the touch adapter turns touches into mouse events the game reads in _input first), so it needs an
+  input design and phone testing.
+- Waiting for the phone: install .work/buckdroid.apk; the launcher then updates the game's scripts by itself (quick
+  update), which brings the multiplayer table optimizations; then a multiplayer heat run.
