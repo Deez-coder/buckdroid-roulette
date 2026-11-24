@@ -1,0 +1,63 @@
+From 692d4cf26f61bfde3fb3bb73b71ae75953b4943a Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 16:46:36 +0300
+Subject: [PATCH] Buckdroid 46-0003b: re-apply the touch-boost opt-out whenever
+ the window gains focus
+
+---
+ .../org/godotengine/godot/GodotActivity.kt    | 32 ++++++++++++++-----
+ 1 file changed, 24 insertions(+), 8 deletions(-)
+
+diff --git a/platform/android/java/lib/src/main/java/org/godotengine/godot/GodotActivity.kt b/platform/android/java/lib/src/main/java/org/godotengine/godot/GodotActivity.kt
+index aed58ed..df10304 100644
+--- a/platform/android/java/lib/src/main/java/org/godotengine/godot/GodotActivity.kt
++++ b/platform/android/java/lib/src/main/java/org/godotengine/godot/GodotActivity.kt
+@@ -123,14 +123,7 @@ abstract class GodotActivity : FragmentActivity(), GodotHost {
+ 		// Buckdroid: Android raises the refresh rate to the maximum on every touch ("touch boost"), which overrides the
+ 		// game's 60 Hz request on Samsung phones (seen as the panel returning to 120 Hz during play). Android 15+ lets
+ 		// the window opt out.
+-		if (android.os.Build.VERSION.SDK_INT >= 35) {
+-			try {
+-				window.setFrameRateBoostOnTouchEnabled(false)
+-				Log.i("godot", "[buckdroid] touch boost off")
+-			} catch (e: Exception) {
+-				Log.w("godot", "[buckdroid] touch boost: $e")
+-			}
+-		}
++		buckdroidDisableTouchBoost()
+ 
+ 		// Register `OnBackPressedCallback` for the Godot fragment.
+ 		onBackPressedDispatcher.addCallback { godotFragment?.onBackPressed() }
+@@ -178,6 +171,29 @@ abstract class GodotActivity : FragmentActivity(), GodotHost {
+ 	@LayoutRes
+ 	protected open fun getGodotAppLayout() = R.layout.godot_app_layout
+ 
++	/**
++	 * Buckdroid: turns off Android's touch boost for the game window (Android 15+). Applied at creation and again
++	 * whenever the window gains focus, because the window's frame-rate state can be reset in between.
++	 */
++	private fun buckdroidDisableTouchBoost() {
++		if (android.os.Build.VERSION.SDK_INT < 35) {
++			return
++		}
++		try {
++			window.setFrameRateBoostOnTouchEnabled(false)
++			Log.i("godot", "[buckdroid] touch boost off")
++		} catch (e: Exception) {
++			Log.w("godot", "[buckdroid] touch boost: $e")
++		}
++	}
++
++	override fun onWindowFocusChanged(hasFocus: Boolean) {
++		super.onWindowFocusChanged(hasFocus)
++		if (hasFocus) {
++			buckdroidDisableTouchBoost()
++		}
++	}
++
+ 	override fun onDestroy() {
+ 		Log.v(TAG, "Destroying GodotActivity $this...")
+ 		super.onDestroy()
+-- 
+2.53.0.windows.2
+

@@ -11,12 +11,18 @@ extends Node
 ##    position-only shadow mesh comes out wrong and the object shadows itself (a dark box over the player's briefcase
 ##    hatch). Changing a loaded mesh's shadow_mesh in place crashes 4.6, so instead each mesh with a shadow mesh is
 ##    replaced by a fresh copy built from its own vertex arrays (and a fresh shadow mesh), once per mesh resource.
+## 3. Grey screen while a scene loads. Since Godot 4.4, change_scene_to_file removes the old scene before the new one
+##    is in, so the frames in between show the game's default clear colour (dark grey). In 4.1 the last frame (black
+##    after the menu fade) stayed up. Fix: while the tree has no current scene, the clear colour is black; the game's
+##    own colour is restored once the new scene is in.
 
 var _fix_skeletons := true
 var _fix_shadow_meshes := true
 var _fresh := {}          # original mesh instance id -> fresh ArrayMesh
 var _fixed_skeletons := 0
 var _rebuild_ms := 0
+var _clear_color := Color(0.3, 0.3, 0.3)
+var _blacked_out := false
 
 
 func _enter_tree() -> void:
@@ -26,11 +32,36 @@ func _enter_tree() -> void:
 	_fix_skeletons = not OS.get_cmdline_user_args().has("--bd-compat-no-skeleton")
 	_fix_shadow_meshes = not OS.get_cmdline_user_args().has("--bd-compat-no-shadowmesh")
 	get_tree().node_added.connect(_on_node_added)
+	get_tree().node_removed.connect(_on_node_removed)
+	_clear_color = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color", _clear_color)
 
 
 func _on_node_added(node: Node) -> void:
 	if node is MeshInstance3D:
 		_fix_mesh_instance.call_deferred(node)
+	elif _blacked_out and is_inside_tree() and node.get_parent() == get_tree().root:
+		_restore_clear_color.call_deferred()
+
+
+func _on_node_removed(node: Node) -> void:
+	# The scene being changed away from is removed while no new scene is in yet: keep the screen black meanwhile.
+	# (4.4+ clears current_scene before removing the old scene, so compare by position instead: a scene file that was
+	# a direct child of the root.)
+	if not is_inside_tree():
+		return   # the whole tree is shutting down
+	if node.get_parent() == get_tree().root and not node.scene_file_path.is_empty():
+		RenderingServer.set_default_clear_color(Color.BLACK)
+		_blacked_out = true
+
+
+func _restore_clear_color() -> void:
+	if not is_inside_tree():
+		return
+	if get_tree().current_scene != null:
+		RenderingServer.set_default_clear_color(_clear_color)
+		_blacked_out = false
+	else:
+		_restore_clear_color.call_deferred()
 
 
 func _fix_mesh_instance(mi: MeshInstance3D) -> void:

@@ -13,7 +13,7 @@ git -C engine/godot apply ../patches/*.patch
 
 ## Godot 4.6.3 (current target)
 
-Source: `engine/godot46` (tag 4.6.3-stable, not in git), build: `engineuild_android46.bat` (needs SDK platforms;android-36, build-tools;36.1.0, ndk;29.0.14206865; SCONS_DIR set). Our build sets `disable_path_overrides=no` so `--main-pack` from the app folder works (official 4.6 templates refuse it). Patches in `engine/patches46/`: 0001 shadow-update budget (paraboloid + cube intervals), 0002 Android 60 Hz request, 0003 touch-boost opt-out in GodotActivity, 0004 per-instance fade in the Mobile renderer (ported from Forward+). Build with Swappy frame pacing (`swappy=yes`; run `python misc/scripts/install_swappy_android.py` in engine/godot46 once).
+Source: `engine/godot46` (tag 4.6.3-stable, not in git), build: `engineuild_android46.bat` (needs SDK platforms;android-36, build-tools;36.1.0, ndk;29.0.14206865; SCONS_DIR set). Our build sets `disable_path_overrides=no` so `--main-pack` from the app folder works (official 4.6 templates refuse it). Patches in `engine/patches46/`: 0001 shadow-update budget (paraboloid + cube intervals), 0002 Android 60 Hz request, 0003 touch-boost opt-out in GodotActivity, 0004 per-instance fade in the Mobile renderer (ported from Forward+), 0005 touch-boost opt-out re-applied on window focus. Build with Swappy frame pacing (`swappy=yes`; run `python misc/scripts/install_swappy_android.py` in engine/godot46 once).
 
 ## Patches (Godot 4.1.1, previous target)
 
