@@ -2,9 +2,8 @@
  * launcher UI kit, GPL-3.0-or-later).
  *
  * The app contains no part of Buckshot Roulette. The player picks their own "Buckshot Roulette.exe" (copied from their
- * Steam folder); the launcher copies it into the app's folder and starts our Godot engine with converter.pck (this
- * project's own code, shipped in the APK assets) to check it and convert it into game.pck. Play then starts the engine
- * on game.pck. Settings live in <external files>/config/graphics.ini and controls.ini, the files the game-side scripts
+ * Steam folder); Converter checks it and converts it into game.pck in the app's folder, on a background thread, while
+ * the Game page shows its progress in place of the Play button. Play then starts the engine on game.pck. Settings live in <external files>/config/graphics.ini and controls.ini, the files the game-side scripts
  * read (src/core/settings.gd), so both sides always agree.
  *
  * The engine activity (com.godot.game.GodotApp) runs in its own ":game" process: leaving the game ends that process and
@@ -13,16 +12,19 @@
 package com.buckdroid.roulette;
 
 import android.content.Intent;
-import android.net.Uri;
+import android.content.res.ColorStateList;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.net.Uri;
 
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class LauncherActivity extends KitActivity {
@@ -30,15 +32,19 @@ public class LauncherActivity extends KitActivity {
     static final String GAME_ACTIVITY = "com.godot.game.GodotApp";
     static final String STEAM_URL = "https://store.steampowered.com/app/2835570/Buckshot_Roulette/";
 
-    File root, config, gamePck, sourceCopy, converterPck, statusFile;
+    File root, config, gamePck, statusFile;
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private TextView progPhase, progDetail;
+    private ProgressBar progBar;
 
     @Override protected void onCreate(android.os.Bundle b) {
         root = getExternalFilesDir(null);                  /* before super.onCreate: it draws the first page */
         config = new File(root, "config");
         config.mkdirs();
         gamePck = new File(root, "game.pck");
-        sourceCopy = new File(root, "import/Buckshot Roulette.exe");
-        converterPck = new File(root, "converter.pck");
+        /* Left over from the first launcher version, which copied the .exe and converted in the engine. */
+        Converter.deleteTree(new File(root, "import"));
+        new File(root, "converter.pck").delete();
         statusFile = new File(root, "convert_status.json");
         super.onCreate(b);
     }
@@ -70,24 +76,71 @@ public class LauncherActivity extends KitActivity {
         return gamePck.exists() && s != null && "done".equals(s.optString("state"));
     }
 
+    static boolean converting() { Converter c = Converter.current; return c != null && "running".equals(c.state); }
+
     @Override protected void onResume() {
-        /* Back from a conversion: once it succeeded the 800 MB copy of the .exe is no longer needed. */
-        JSONObject s = status();
-        if (s != null && "done".equals(s.optString("state")) && sourceCopy.exists()) sourceCopy.delete();
         super.onResume();
+        ui.removeCallbacks(tick);
+        if (converting()) ui.post(tick);
     }
+
+    @Override protected void onPause() {
+        super.onPause();
+        ui.removeCallbacks(tick);
+    }
+
+    /* While a conversion runs: refresh the progress views four times a second, redraw the page when it ends. */
+    private final Runnable tick = new Runnable() {
+        @Override public void run() {
+            Converter c = Converter.current;
+            if (c == null) return;
+            if (!"running".equals(c.state)) {
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if ("done".equals(c.state)) toast("The game is ready.");
+                show(tab);
+                return;
+            }
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            if (progBar != null && progBar.isAttachedToWindow()) {
+                progPhase.setText(c.phase);
+                progDetail.setText(c.detail);
+                progBar.setProgress(Math.round(c.fraction * 1000));
+            }
+            ui.postDelayed(this, 250);
+        }
+    };
 
     /* ------------------------------------------------------------ Game */
     void gamePage() {
-        boolean ready = gameReady();
+        boolean busy = converting();
+        boolean ready = !busy && gameReady();
         JSONObject s = status();
         LinearLayout card = card();
         card.addView(text("Buckshot Roulette", 20, TEXT, true));
         card.addView(text("Single player. Multiplayer is coming later.", 13, DIM, false));
         card.addView(space(12));
-        card.addView(statusLine("Game", ready ? "ready" : "not set up yet", ready ? OK : WARN));
+        card.addView(statusLine("Game", busy ? "setting up..." : ready ? "ready" : "not set up yet", ready ? OK : busy ? ACCENT2 : WARN));
         if (ready) card.addView(statusLine("Version", s.optString("detail").replace(" is ready", "").replaceAll("\\s*\\(.*\\)\\.?$", ""), DIM));
         card.addView(space(16));
+        if (busy) {
+            /* The progress takes the Play button's place until the game is ready. */
+            Converter c = Converter.current;
+            progPhase = text(c.phase, 15, TEXT, true);
+            card.addView(progPhase);
+            progBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            progBar.setMax(1000);
+            progBar.setProgress(Math.round(c.fraction * 1000));
+            progBar.setProgressTintList(ColorStateList.valueOf(ACCENT2));
+            progBar.setProgressBackgroundTintList(ColorStateList.valueOf(CARD2));
+            card.addView(progBar, fullWidth(20));
+            progDetail = text(c.detail, 12, DIM, false);
+            card.addView(progDetail);
+            card.addView(text("Keep the app open. Everything stays on this phone.", 12, DIM, false));
+            content.addView(card);
+            ui.removeCallbacks(tick);
+            ui.post(tick);
+            return;
+        }
         Button play = button(ready ? "▶  Play" : "Set up the game first", ready ? ACCENT : CARD2);
         play.setTextSize(18);
         play.setEnabled(ready);
@@ -114,39 +167,18 @@ public class LauncherActivity extends KitActivity {
             startActivityForResult(i, REQ_GAME_FILE);
         });
         imp.addView(pick, fullWidth(48));
-        if (sourceCopy.exists() && !ready) {
-            imp.addView(space(6));
-            Button again = button("Convert the copied file again", CARD2);
-            again.setOnClickListener(v -> startConversion());
-            imp.addView(again, fullWidth(48));
-        }
         imp.addView(space(6));
-        imp.addView(text("Needs about 2 GB free while setting up, 0.8 GB afterwards.", 11, DIM, false));
+        imp.addView(text("Needs about 1.2 GB free while setting up, 0.75 GB afterwards. The picked file is only read; "
+                + "you can delete it afterwards.", 11, DIM, false));
         content.addView(imp);
     }
 
     @Override protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (req != REQ_GAME_FILE || res != RESULT_OK || data == null || data.getData() == null) return;
-        Uri uri = data.getData();
-        background("Copying the game file…", () -> {
-            sourceCopy.getParentFile().mkdirs();
-            try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(sourceCopy)) {
-                pipe(in, out);
-            }
-        }, this::startConversion);
-    }
-
-    /* Starts the engine with converter.pck (from the APK assets) as the main pack. */
-    void startConversion() {
-        try {
-            try (InputStream in = getAssets().open("converter.pck"); OutputStream out = new FileOutputStream(converterPck)) { pipe(in, out); }
-        } catch (Exception e) { toast("The converter is missing from this app: " + e.getMessage()); return; }
         statusFile.delete();
-        String[] args = {"--main-pack", converterPck.getAbsolutePath(), "--",
-                "--source=" + sourceCopy.getAbsolutePath(), "--out=" + gamePck.getAbsolutePath(),
-                "--status=" + statusFile.getAbsolutePath()};
-        startActivity(new Intent().setClassName(this, GAME_ACTIVITY).putExtra("command_line_params", args));
+        Converter.start(this, data.getData(), gamePck, statusFile);
+        show(0);
     }
 
     /* ------------------------------------------------------------ Graphics (src/core/settings.gd reads these keys) */

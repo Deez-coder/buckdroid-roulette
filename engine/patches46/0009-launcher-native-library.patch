@@ -1,0 +1,26 @@
+From 790ffa09718efbe91daf30e24129bbaad99329aa Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 18:14:52 +0300
+Subject: [PATCH] Buckdroid: launcher native converter library
+ (launcher/jniLibs) in the app
+
+---
+ platform/android/java/app/build.gradle | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/platform/android/java/app/build.gradle b/platform/android/java/app/build.gradle
+index 783851b..4986c2f 100644
+--- a/platform/android/java/app/build.gradle
++++ b/platform/android/java/app/build.gradle
+@@ -252,6 +252,8 @@ android {
+         main.res.srcDirs += ['res']
+         // Buckdroid: the launcher (repository folder launcher/java, the user's launcher UI kit plus our activity).
+         main.java.srcDirs += ['../../../../../../launcher/java']
++        // Buckdroid: the launcher's texture converter (native/build_android.bat builds it there).
++        main.jniLibs.srcDirs += ['../../../../../../launcher/jniLibs']
+         debug.jniLibs.srcDirs = ['libs/debug', 'libs/debug/vulkan_validation_layers']
+         dev.jniLibs.srcDirs = ['libs/dev']
+         release.jniLibs.srcDirs = ['libs/release']
+-- 
+2.53.0.windows.2
+

@@ -48,3 +48,6 @@ __pycache__/
 .gradle/
 .idea/
 .vscode/
+
+# Native converter library, built from native/ by native/build_android.bat
+/launcher/jniLibs/

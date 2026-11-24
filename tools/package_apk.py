@@ -3,7 +3,8 @@ Original code, part of Buckdroid Roulette (GPL-3.0-or-later).
 
 Takes our engine template APK (engine/build_android46.bat: Godot 4.6.3 + patches + the launcher), adds:
   assets/_cl_            the engine command line: --main-pack <app folder>/game.pck (the game converted on the phone)
-  assets/converter.pck   the converter package (tools/build_converter_pck.py), this project's own code only
+  assets/payload/        what the launcher's converter (Converter.java) injects into the game: the Buckdroid scripts
+                         (src/), versions.json and autoloads.json (patches/). This project's own code only
 then zip-aligns and signs it. The APK never contains game content.
 
     python tools/package_apk.py <out.apk> [--keystore K --ks-pass P]   (default: the local debug key in .cache/android)
@@ -22,7 +23,6 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import build_converter_pck  # noqa: E402
-from gdpck import bytes_writer, write_pck  # noqa: E402
 
 PACKAGE = "com.buckdroid.roulette"
 TEMPLATE = os.path.join(ROOT, "engine", "godot46", "bin", "android_debug.apk")
@@ -45,10 +45,9 @@ def main() -> None:
     ap.add_argument("--ks-pass", default="android")
     a = ap.parse_args()
 
-    files = build_converter_pck.collect()
+    files = {"assets/payload/" + p[len("res://payload/"):]: d
+             for p, d in build_converter_pck.collect().items() if p.startswith("res://payload/")}
     with tempfile.TemporaryDirectory() as tmp:
-        conv = os.path.join(tmp, "converter.pck")
-        write_pck(conv, build_converter_pck.ENGINE, [(p, len(d), bytes_writer(d)) for p, d in files.items()])
         args = ["--main-pack", f"/storage/emulated/0/Android/data/{PACKAGE}/files/game.pck", "--use_immersive"]
         unsigned = os.path.join(tmp, "unsigned.apk")
         with zipfile.ZipFile(a.template) as src, zipfile.ZipFile(unsigned, "w") as dst:
@@ -56,14 +55,14 @@ def main() -> None:
                 n = i.filename
                 if n.startswith("META-INF/") and n.endswith((".SF", ".RSA", ".MF", ".EC", ".DSA")):
                     continue
-                if n in ("assets/_cl_", "assets/converter.pck"):
+                if n in ("assets/_cl_", "assets/converter.pck") or n.startswith("assets/payload/") or n in files:
                     continue
                 dst.writestr(i, src.read(n))
             dst.writestr(zipfile.ZipInfo("assets/_cl_"), cl_blob(args))
-            info = zipfile.ZipInfo("assets/converter.pck")
-            info.compress_type = zipfile.ZIP_STORED
-            with open(conv, "rb") as f:
-                dst.writestr(info, f.read())
+            for n, d in sorted(files.items()):
+                dst.writestr(zipfile.ZipInfo(n), d, compress_type=zipfile.ZIP_DEFLATED)
+            if "lib/arm64-v8a/libbdconvert.so" not in src.namelist():
+                sys.exit("the template has no libbdconvert.so: run native/build_android.bat, then engine/build_android46.bat")
         aligned = os.path.join(tmp, "aligned.apk")
         subprocess.run([os.path.join(BUILD_TOOLS, "zipalign.exe"), "-f", "-p", "4", unsigned, aligned], check=True)
         jdk = glob.glob(os.path.join(ROOT, ".cache", "jdk17", "jdk-17*"))[0]
@@ -71,7 +70,7 @@ def main() -> None:
             os.remove(a.out)
         subprocess.run([os.path.join(jdk, "bin", "java.exe"), "-jar", os.path.join(BUILD_TOOLS, "lib", "apksigner.jar"),
                         "sign", "--ks", a.keystore, "--ks-pass", "pass:" + a.ks_pass, "--out", a.out, aligned], check=True)
-    print(f"wrote {a.out} ({os.path.getsize(a.out) / 1e6:.1f} MB), converter {len(files)} files, command line {args}")
+    print(f"wrote {a.out} ({os.path.getsize(a.out) / 1e6:.1f} MB), payload {len(files)} files, command line {args}")
 
 
 if __name__ == "__main__":
