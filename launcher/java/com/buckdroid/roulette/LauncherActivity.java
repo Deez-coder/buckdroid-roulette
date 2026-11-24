@@ -232,9 +232,21 @@ public class LauncherActivity extends KitActivity {
         Ini c = controls();
         LinearLayout t = card();
         t.addView(header("Touch"));
-        t.addView(choice(c, "touch_mode", "Touch mode", new String[]{"direct", "relative"}, new String[]{"Tap", "Trackpad"}, "direct",
-                "Tap: touch what you want to click. Trackpad: drag to move a cursor, tap to click."));
-        if ("relative".equalsIgnoreCase(c.get("touch_mode", "direct"))) {
+        c.remove("touch_pad");   /* from the build where the buttons were a separate switch */
+        t.addView(choice(c, "touch_mode", "Touch mode", new String[]{"direct", "relative", "pad"}, new String[]{"Tap", "Trackpad", "Buttons"}, "direct",
+                "Tap: touch what you want to click. Trackpad: drag to move a cursor, tap to click. Buttons: a D-pad, A, B and a "
+                        + "menu button over the game, played the game's controller way; tapping the game is off."));
+        String mode = c.get("touch_mode", "direct");
+        if ("pad".equalsIgnoreCase(mode)) {
+            t.addView(slider(c, "touch_opacity", "Opacity", 10, 100, 5, 45, "%", 0.01f, null));
+            t.addView(slider(c, "touch_scale", "Size", 60, 160, 5, 100, "%", 0.01f, null));
+            t.addView(space(6));
+            Button edit = button("Edit button layout", ACCENT2);
+            edit.setOnClickListener(v -> startActivity(new Intent(this, TouchLayoutEditorActivity.class)
+                    .putExtra(TouchLayoutEditorActivity.EXTRA_FILE, new File(config, "controls.ini").getAbsolutePath())));
+            t.addView(edit, fullWidth(48));
+            t.addView(text("The buttons hide while a controller is used and come back at the next touch.", 12, DIM, false));
+        } else if ("relative".equalsIgnoreCase(mode)) {
             t.addView(slider(c, "cursor_speed", "Cursor speed", 25, 400, 25, 100, "%", 0.01f, null));
             t.addView(slider(c, "cursor_size", "Cursor size", 50, 300, 25, 100, "%", 0.01f, null));
         } else {
@@ -242,22 +254,6 @@ public class LauncherActivity extends KitActivity {
                     "A tap that just misses goes to the nearest thing you can use."));
         }
         content.addView(t);
-
-        LinearLayout ob = card();
-        ob.addView(header("On-screen buttons"));
-        ob.addView(choice(c, "touch_pad", "Show", new String[]{"off", "auto", "on"}, new String[]{"Off", "Auto", "Always"}, "off",
-                "A D-pad, A, B and a menu button over the game, for playing the game's controller way. Tapping the game still "
-                        + "works. Auto hides them while a controller is used. Applies the next time the game starts."));
-        if (!"off".equalsIgnoreCase(c.get("touch_pad", "off"))) {
-            ob.addView(slider(c, "touch_opacity", "Opacity", 10, 100, 5, 45, "%", 0.01f, null));
-            ob.addView(slider(c, "touch_scale", "Size", 60, 160, 5, 100, "%", 0.01f, null));
-            ob.addView(space(6));
-            Button edit = button("Edit button layout", ACCENT2);
-            edit.setOnClickListener(v -> startActivity(new Intent(this, TouchLayoutEditorActivity.class)
-                    .putExtra(TouchLayoutEditorActivity.EXTRA_FILE, new File(config, "controls.ini").getAbsolutePath())));
-            ob.addView(edit, fullWidth(48));
-        }
-        content.addView(ob);
 
         LinearLayout pad = card();
         pad.addView(header("Controller"));

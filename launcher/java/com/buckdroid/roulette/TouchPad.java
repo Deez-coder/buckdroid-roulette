@@ -5,15 +5,13 @@
  * game's own controller support reads like any controller: the D-pad moves the selection, A uses it, B goes back. MENU acts
  * as Android's back button (BuckdroidBack: press twice to leave a game, twice in the menu to quit).
  *
- * Touches that do not start on a button are not taken (the view returns false), so they reach the game as normal taps and
- * the game switches back to its mouse mode by itself. Once a finger holds a button, Android sends the view's later fingers
- * to it as well; those are ignored until it lifts.
+ * It is one of the three touch modes (the user's choice): with touch_mode = pad the view takes every touch, so tapping the
+ * game does nothing and only the buttons act. The buttons hide while a real controller is used and come back at the next
+ * touch. The small ring at the top centre hides them for this session (touches still do nothing then).
  *
  * controls.ini (read at start and again when it changes, about once a second):
- *   touch_pad = off | auto | on   off (default): not shown at all. auto: hides while a controller is used, back at the next
- *                                  touch. on: always shown.
+ *   touch_mode = direct | relative | pad   (the view is only added for pad)
  *   touch_opacity = 0.1..1 (0.45)   touch_scale = 0.6..1.6 (1.0)   pos_<KEY> = x y size (TouchLayout)
- * The small ring at the top centre hides and shows the buttons for this session.
  *
  * Adapted from the touch-controls kit's TouchControlsView (SMO Android Port, GPL-3.0-or-later), 2026-11. */
 package com.buckdroid.roulette;
@@ -41,7 +39,7 @@ public final class TouchPad extends View {
     final Ini ini;
     volatile Godot godot;
 
-    int mode;                                      /* 0 off, 1 auto, 2 always */
+    boolean on;                                    /* touch_mode = pad */
     float opacity = 0.45f, scale = 1f;
     long iniTime = -1, iniCheckedAt;
     boolean hiddenByRing, hiddenByController;
@@ -51,11 +49,11 @@ public final class TouchPad extends View {
     int sent;                                      /* the joypad buttons Godot has as pressed, bits by TouchLayout index */
     float aspect = 16f / 9f;
 
-    /* Puts the buttons over the game when touch_pad is not off; returns null otherwise. */
+    /* Puts the buttons over the game when touch_mode is pad; returns null otherwise. */
     public static TouchPad attach(Activity a) {
         File f = new File(new File(a.getExternalFilesDir(null), "config"), "controls.ini");
         TouchPad p = new TouchPad(a, f);
-        if (p.mode == 0) return null;
+        if (!p.on) return null;
         a.addContentView(p, new ViewGroup.LayoutParams(-1, -1));
         return p;
     }
@@ -76,8 +74,7 @@ public final class TouchPad extends View {
 
     /* ------------------------------------------------------------ settings */
     void reload() {
-        String t = ini.get("touch_pad", "off");
-        mode = "on".equalsIgnoreCase(t) ? 2 : "auto".equalsIgnoreCase(t) ? 1 : 0;
+        on = "pad".equalsIgnoreCase(ini.get("touch_mode", "direct"));
         opacity = TouchLayout.clamp(TouchLayout.num(ini.get("touch_opacity", "0.45"), 0.45f), 0.1f, 1f);
         scale = TouchLayout.clamp(TouchLayout.num(ini.get("touch_scale", "1.0"), 1f), 0.6f, 1.6f);
         layout.load(ini);
@@ -91,16 +88,16 @@ public final class TouchPad extends View {
         if (ini.file.lastModified() != iniTime) reload();
     }
 
-    /* A real controller sent input: with touch_pad = auto the buttons step aside until the next touch. */
+    /* A real controller sent input: the buttons step aside until the next touch. */
     public void controllerUsed() {
-        if (mode == 1 && !hiddenByController) { hiddenByController = true; release(); invalidate(); }
+        if (on && !hiddenByController) { hiddenByController = true; release(); invalidate(); }
     }
     public static boolean isController(int source) {
         return (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
                 || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
     }
 
-    boolean shown() { return mode != 0 && !hiddenByRing && !hiddenByController; }
+    boolean shown() { return on && !hiddenByRing && !hiddenByController; }
 
     /* ------------------------------------------------------------ geometry (window parts; radii in parts of the height) */
     float distH(float ax, float ay, float bx, float by) { float dx = (ax - bx) * aspect, dy = ay - by; return (float) Math.sqrt(dx * dx + dy * dy); }
@@ -124,12 +121,12 @@ public final class TouchPad extends View {
         int kind = e.getActionMasked(), idx = e.getActionIndex();
         float W = getWidth(), H = getHeight();
         if (kind == MotionEvent.ACTION_DOWN) {
-            /* A new gesture: decide whether it is ours. Not on a button (or the ring): leave it to the game. */
+            /* A new gesture. Every touch is ours (taps on the game are off in this mode); only buttons do something. */
             float x = e.getX() / W, y = e.getY() / H;
-            if (mode == 0) return false;
+            if (!on) return false;
             if (onRing(x, y)) { hiddenByRing = !hiddenByRing; hiddenByController = false; release(); invalidate(); return true; }
-            if (hiddenByController) { hiddenByController = false; invalidate(); return false; }
-            if (!shown() || hitButton(x, y) < 0) return false;
+            if (hiddenByController) { hiddenByController = false; invalidate(); return true; }
+            if (!shown()) return true;
         }
         for (int i = 0; i < e.getPointerCount(); i++) {
             int id = e.getPointerId(i);
@@ -182,7 +179,7 @@ public final class TouchPad extends View {
 
     /* ------------------------------------------------------------ drawing */
     @Override protected void onDraw(Canvas c) {
-        if (mode == 0) return;
+        if (!on) return;
         float W = getWidth(), H = getHeight();
         draw.ring(c, TouchLayout.TOGGLE_X * W, TouchLayout.TOGGLE_Y * H, TouchLayout.TOGGLE_R * scale * H, opacity,
                 hiddenByRing ? 0x73 : 0xE6);
