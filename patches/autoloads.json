@@ -1,0 +1,61 @@
+{
+  "_comment": "Buckdroid's own autoloads, injected before the game's autoloads in this order (name, script path under res://buckdroid/). Shared by tools/build_patched_pck.py and the on-device converter.",
+  "autoloads": [
+    {
+      "name": "BuckdroidSettings",
+      "script": "core/settings.gd"
+    },
+    {
+      "name": "BuckdroidCompat",
+      "script": "compat/newer_engine.gd"
+    },
+    {
+      "name": "BuckdroidPlatform",
+      "script": "platform/platform.gd"
+    },
+    {
+      "name": "Steam",
+      "script": "platform/steam_stub.gd"
+    },
+    {
+      "name": "BuckdroidBoot",
+      "script": "core/boot.gd"
+    },
+    {
+      "name": "BuckdroidToast",
+      "script": "ui/toast.gd"
+    },
+    {
+      "name": "BuckdroidTouch",
+      "script": "input/touch_adapter.gd"
+    },
+    {
+      "name": "BuckdroidBack",
+      "script": "input/back_button.gd"
+    },
+    {
+      "name": "BuckdroidTransparencyFallback",
+      "script": "render/transparency_fallback.gd"
+    },
+    {
+      "name": "BuckdroidRender",
+      "script": "render/render_settings.gd"
+    },
+    {
+      "name": "BuckdroidThermal",
+      "script": "render/thermal_guard.gd"
+    },
+    {
+      "name": "BuckdroidPerfOverlay",
+      "script": "render/perf_overlay.gd"
+    },
+    {
+      "name": "BuckdroidIdlePacing",
+      "script": "render/idle_pacing.gd"
+    },
+    {
+      "name": "BuckdroidTelemetry",
+      "script": "core/telemetry.gd"
+    }
+  ]
+}

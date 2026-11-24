@@ -29,22 +29,12 @@ RES_PREFIX = "res://buckdroid/"
 
 # Our autoloads, in order. They are placed before the game's own so the Steam stub exists when the game's
 # Steam autoload starts. "*" marks them as global singletons (callable by name from scripts).
-AUTOLOADS = [
-    ("BuckdroidSettings", "core/settings.gd"),
-    ("BuckdroidCompat", "compat/newer_engine.gd"),
-    ("BuckdroidPlatform", "platform/platform.gd"),
-    ("Steam", "platform/steam_stub.gd"),
-    ("BuckdroidBoot", "core/boot.gd"),
-    ("BuckdroidToast", "ui/toast.gd"),
-    ("BuckdroidTouch", "input/touch_adapter.gd"),
-    ("BuckdroidBack", "input/back_button.gd"),
-    ("BuckdroidTransparencyFallback", "render/transparency_fallback.gd"),
-    ("BuckdroidRender", "render/render_settings.gd"),
-    ("BuckdroidThermal", "render/thermal_guard.gd"),
-    ("BuckdroidPerfOverlay", "render/perf_overlay.gd"),
-    ("BuckdroidIdlePacing", "render/idle_pacing.gd"),
-    ("BuckdroidTelemetry", "core/telemetry.gd"),
-]
+def load_autoloads():
+    with open(os.path.join(ROOT, "patches", "autoloads.json"), encoding="utf-8") as f:
+        return [(a["name"], a["script"]) for a in json.load(f)["autoloads"]]
+
+
+AUTOLOADS = load_autoloads()
 
 
 def load_versions():

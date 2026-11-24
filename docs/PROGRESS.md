@@ -235,3 +235,11 @@ Recon: the game has full controller support of its own (ControllerManager, 3D se
 - **Back button** (`src/input/back_button.gd`, autoload BuckdroidBack; Android's instant close off via `application/config/quit_on_go_back = false`): in the menu, back twice within 2.5 s quits; elsewhere back twice leaves to the menu by holding the game's own "exit game" action for the player. Hint via `src/ui/toast.gd` (BuckdroidToast). Verified on the phone by the user (game to menu, menu to quit, a single press only shows the hint).
 - **Tap assist** (touch_adapter, controls.ini `tap_assist`, default **off**, user decision): a direct-mode tap that hits nothing goes to the nearest usable object within 10/20/32 base px (same raycast as the game). PC A/B: the same tap beside the shotgun grabs it with assist on, nothing with assist off.
 - Removed on user request: confirm-before-shoot ("useless"), vibration (would add the VIBRATE permission to the app; engine commit reverted, module deleted).
+
+## Phase 6 launcher (started 2026-11-24, license GPL-3.0-or-later by user decision)
+
+Design (Claude's choices): one APK = our Godot 4.6.3 template + a Java launcher from the user's UI kit as the launcher activity; the game runs as the Godot activity in its own process. On-device conversion runs inside our engine: the launcher starts it with `converter.pck` (our code only) as the main pack.
+- `converter/` (GDScript): `pck.gd` (port of gdpck.py), `ecfg.gd` (port of ecfg.py), `textures.gd` (from transcode_etc2.gd, pure per-texture function), `converter.gd` (identify by project.binary md5, exe size + SHA-256 check, autoload injection, overrides, 4.6 adaptations, ETC2 on WorkerThreadPool in batches, streamed pack writing, progress UI in the kit colours, status JSON for the launcher). `patches/autoloads.json` is now the shared autoload list.
+- `tools/build_converter_pck.py` builds `converter.pck` (minimal project.binary, main scene, converter scripts, payload = src/ + versions.json + autoloads.json).
+- Engine patch 46-0006 enables etcpak compression in export templates.
+- PC test (Godot 4.6.3 editor binary): full conversion in 13 s; output identical to `build_patched_pck.py --android` except the 874 texture files (newer etcpak build), same paths and project.binary order.
