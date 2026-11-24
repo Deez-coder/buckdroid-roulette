@@ -5,10 +5,13 @@ extends Node
 ## A lobby is a star around the host, like the game's own design: every member has one WebRTC data channel to the host,
 ## and the host forwards. The game never sees this; steam_stub.gd turns its Steam lobby and P2P calls into calls here.
 ##
-## Finding the host (this file, local network): the host announces its lobby by UDP broadcast; a joiner that knows the
-## lobby ID waits for the announcement and opens a short TCP connection to the host to exchange the WebRTC offer and answer.
-## Then the TCP connection closes and everything runs over the data channel. (Room codes over the internet: a second
-## signalling path, docs/MULTIPLAYER.md step 4.)
+## Finding the host, two ways at once (whichever answers first is used):
+##   - local network: the host announces its lobby by UDP broadcast; a joiner that knows the lobby ID waits for the
+##     announcement and opens a short TCP connection to the host to exchange the WebRTC offer and answer;
+##   - internet: the lobby ID is the room code; both sides meet through public brokers with encrypted, authenticated
+##     messages (room_signal.gd). Local network addresses are left out of what is sent this way, and public STUN servers
+##     help the direct connection through routers.
+## Then everything runs over the WebRTC data channel, directly between the phones.
 ##
 ## Wire format on the data channel: one byte message type, then
 ##   MSG_CTL   var_to_bytes(Dictionary) (objects never decoded): hello, welcome, deny, joined, left, data, ping, pong
@@ -36,6 +39,9 @@ const MAX_CHAT := 200
 const MSG_CTL := 1
 const MSG_GAME := 2
 const MSG_CHAT := 3
+const STUN := ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"]
+const OFFER_RETRY := 4.0
+const RoomSignal := preload("res://buckdroid/net/room_signal.gd")
 
 # Steam enum values (the same as steam_stub.gd)
 const ENTER_SUCCESS := 1
@@ -71,14 +77,18 @@ var _join_started := 0.0
 var _join_peer: Peer
 var _next_key := 1
 var _direct_host := ""            # dev and tests: --bd-net-host=ip:port skips discovery
+var _no_lan := false              # tests: --bd-net-no-lan forces the internet path
 var _kicked: Array[int] = []
+var _room: RefCounted             # RoomSignal while hosting (new members) or joining (until welcomed)
 
 
 class Peer:
 	var key := 0
 	var id := 0                   # the member's player ID, after hello
 	var name := ""
-	var tcp: StreamPeerTCP        # signalling, closed once the channel is open
+	var tcp: StreamPeerTCP        # signalling over the local network, closed once the channel is open
+	var room_sid := ""            # signalling through the room: the other side's session ID ("" = not known yet)
+	var via_room := false
 	var pc: WebRTCPeerConnection
 	var ch: WebRTCDataChannel
 	var open := false
@@ -95,6 +105,8 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bd-net-host="):
 			_direct_host = arg.trim_prefix("--bd-net-host=")
+		elif arg == "--bd-net-no-lan":
+			_no_lan = true
 	var vf := FileAccess.open("res://buckdroid/versions.json", FileAccess.READ)
 	if vf:
 		var v = JSON.parse_string(vf.get_as_text())
@@ -160,8 +172,9 @@ func create_lobby(limit: int) -> void:
 		_server = null
 		lobby_created.emit.call_deferred(false, 0)
 		return
-	_announce = PacketPeerUDP.new()
-	_announce.set_broadcast_enabled(true)
+	if not _no_lan:
+		_announce = PacketPeerUDP.new()
+		_announce.set_broadcast_enabled(true)
 	lobby_id = _new_lobby_id()
 	owner_id = my_id
 	is_host = true
@@ -170,16 +183,18 @@ func create_lobby(limit: int) -> void:
 	members = [{"id": my_id, "name": my_name}]
 	lobby_data = {}
 	_kicked.clear()
-	print("[buckdroid] lobby %d hosted on TCP port %d" % [lobby_id, _server.get_local_port()])
+	_start_room(lobby_id)
+	print("[buckdroid] lobby hosted (local port %d, internet room on)" % _server.get_local_port())
 	lobby_created.emit.call_deferred(true, lobby_id)
 	lobby_joined.emit.call_deferred(lobby_id, ENTER_SUCCESS)
 
 
 static func _new_lobby_id() -> int:
-	# 12 digits: short enough to read out, random enough not to collide on a network.
+	# 16 digits (about 53 bits): the room code for internet play, so it must not be guessable. Shared by copy and paste
+	# (the game's own "copy lobby ID" and "join with pasted ID").
 	var c := Crypto.new()
 	var b := c.generate_random_bytes(8)
-	return 100000000000 + absi(b.decode_s64(0)) % 900000000000
+	return 1000000000000000 + absi(b.decode_s64(0)) % 9000000000000000
 
 
 func join_lobby(id: int) -> void:
@@ -190,6 +205,7 @@ func join_lobby(id: int) -> void:
 	_joining = id
 	_join_started = _now()
 	_start_listening()
+	_start_room(id)
 	if _direct_host != "":
 		var p := _direct_host.split(":")
 		if p.size() == 2:
@@ -204,6 +220,9 @@ func leave_lobby() -> void:
 		_server.stop()
 		_server = null
 	_announce = null
+	if _room:
+		_room.stop()
+		_room = null
 	_join_peer = null
 	_joining = 0
 	lobby_id = 0
@@ -298,14 +317,22 @@ func _process(delta: float) -> void:
 	if not available:
 		return
 	_poll_discovery(delta)
+	if _room:
+		_room.poll()
+		_poll_room_join()
 	if _server:
 		while _server.is_connection_available():
 			_accept(_server.take_connection())
-	if _joining != 0 and _join_peer == null:
+	var room_waiting := _join_peer != null and _join_peer.via_room and _join_peer.room_sid == ""
+	if _joining != 0 and (_join_peer == null or room_waiting):
 		var f: Dictionary = _found.get(_joining, {})
 		if not f.is_empty():
-			_connect_to_host(f.ip, f.port)
-		elif _now() - _join_started > JOIN_TIMEOUT:
+			_connect_to_host(f.ip, f.port)       # on the same network: the direct local path wins
+		elif _now() - _join_started > JOIN_TIMEOUT * 2:
+			if _join_peer:
+				_close_peer(_join_peer, false)
+				_peers.erase(0)
+				_join_peer = null
 			var id := _joining
 			_joining = 0
 			lobby_joined.emit(id, ENTER_DOESNT_EXIST)
@@ -341,7 +368,7 @@ func _poll_discovery(delta: float) -> void:
 
 
 func _start_listening() -> void:
-	if _listen:
+	if _listen or _no_lan:
 		return
 	_listen = PacketPeerUDP.new()
 	if _listen.bind(DISCOVERY_PORT) != OK:
@@ -349,11 +376,12 @@ func _start_listening() -> void:
 
 
 # --- connections -----------------------------------------------------------------------------------------------------
-func _new_peer() -> Peer:
+func _new_peer(via_room := false) -> Peer:
 	var p := Peer.new()
+	p.via_room = via_room
 	p.pc = WebRTCPeerConnection.new()
-	# Local network for now: no STUN needed. Room codes add public STUN servers here.
-	p.pc.initialize({"iceServers": []})
+	# Over the internet, public STUN servers tell each side its public address (local network: not needed).
+	p.pc.initialize({"iceServers": [{"urls": STUN}] if via_room else []})
 	p.ch = p.pc.create_data_channel("bd", {"negotiated": true, "id": 1})
 	p.pc.session_description_created.connect(func(type: String, sdp: String) -> void:
 		p.pc.set_local_description(type, sdp)
@@ -366,6 +394,11 @@ func _new_peer() -> Peer:
 
 
 func _connect_to_host(ip: String, port: int) -> void:
+	if _join_peer != null and _join_peer.via_room and _join_peer.room_sid != "":
+		return                           # already talking to the host through the room
+	if _join_peer != null:
+		_close_peer(_join_peer, false)
+		_peers.erase(0)
 	var p := _new_peer()
 	p.key = 0
 	p.tcp = StreamPeerTCP.new()
@@ -389,6 +422,84 @@ func _accept(tcp: StreamPeerTCP) -> void:
 func _signal(p: Peer, msg: Dictionary) -> void:
 	if p.tcp and p.tcp.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 		p.tcp.put_var(msg)
+	elif p.via_room and _room:
+		if msg.get("t") == "cand" and " typ host" in str(msg.get("name", "")):
+			return                       # never send this device's local network addresses over the internet
+		if msg.get("t") == "sdp":
+			msg = msg.duplicate()
+			msg["sdp"] = _strip_host_candidates(str(msg.sdp))
+			if msg.get("type") == "offer":
+				p.set_meta("offer", msg)
+				p.set_meta("offer_at", _now())
+		_room.send(p.room_sid, msg)
+
+
+static func _strip_host_candidates(sdp: String) -> String:
+	var out := PackedStringArray()
+	for line in sdp.split("\n"):
+		if line.begins_with("a=candidate:") and " typ host" in line:
+			continue
+		out.append(line)
+	return "\n".join(out)
+
+
+# --- the internet room ------------------------------------------------------------------------------------------------
+func _start_room(id: int) -> void:
+	if _room:
+		_room.stop()
+	_room = RoomSignal.new(str(id))
+	_room.message.connect(_on_room)
+	_room.start()
+
+
+## Joining through the room: once a broker is connected, make one peer and send its offer to the room (to everyone:
+## only the host answers). Resent until answered, since brokers deliver at most once.
+func _poll_room_join() -> void:
+	if is_host or _joining == 0 or _room == null or _room.connected_count() == 0:
+		return
+	if _join_peer == null:
+		var p := _new_peer(true)
+		p.key = 0
+		_join_peer = p
+		_peers[0] = p
+		p.pc.create_offer()
+		return
+	var jp := _join_peer
+	if jp.via_room and not jp.open and jp.room_sid == "" and jp.has_meta("offer") and _now() - float(jp.get_meta("offer_at")) > OFFER_RETRY:
+		jp.set_meta("offer_at", _now())
+		_room.send("", jp.get_meta("offer"))
+
+
+func _on_room(from: String, m: Dictionary) -> void:
+	var t := str(m.get("t", ""))
+	var p: Peer = null
+	for q in _peers.values():
+		if q.via_room and q.room_sid == from:
+			p = q
+	if is_host:
+		if p == null:
+			if t != "sdp" or str(m.get("type", "")) != "offer" or not joinable or _peers.size() >= member_limit - 1:
+				return
+			p = _new_peer(true)
+			p.key = _next_key
+			_next_key += 1
+			p.room_sid = from
+			_peers[p.key] = p
+			p.pc.set_remote_description("offer", str(m.get("sdp", "")))
+			return
+	else:
+		var jp := _join_peer
+		if jp == null or not jp.via_room or _joining == 0:
+			return
+		if jp.room_sid == "":
+			if t != "sdp" or str(m.get("type", "")) != "answer":
+				return
+			jp.room_sid = from          # the host
+			jp.pc.set_remote_description("answer", str(m.get("sdp", "")))
+			return
+		p = jp
+	if p and t == "cand":
+		p.pc.add_ice_candidate(str(m.get("media", "")), int(m.get("index", 0)), str(m.get("name", "")))
 
 
 func _poll_peer(p: Peer) -> void:
@@ -418,13 +529,18 @@ func _poll_peer(p: Peer) -> void:
 			p.last_heard = _now()
 			if not is_host:
 				_send_ctl(p, {"t": "hello", "proto": PROTOCOL, "ver": game_version, "id": my_id, "name": my_name})
-		elif _now() - p.started > JOIN_TIMEOUT:
+		elif _now() - p.started > (JOIN_TIMEOUT * 2 if p.via_room else JOIN_TIMEOUT):
 			if not is_host and _joining != 0:
+				if p.via_room and p.room_sid == "":
+					return                       # nobody answered yet: the lobby timeout above decides
 				var id := _joining
 				_joining = 0
 				_close_peer(p, false)
 				_peers.erase(0)
 				_join_peer = null
+				if p.via_room:
+					# The host answered but no direct path got through (strict routers on both sides).
+					_toast("Could not connect directly to the host. Try the same Wi-Fi, or another network.")
 				lobby_joined.emit(id, ENTER_ERROR)
 			else:
 				_close_peer(p, false)
@@ -571,6 +687,9 @@ func _on_ctl(p: Peer, m: Dictionary) -> void:
 					lobby_data[str(k)] = str(d[k])
 			p.id = owner_id
 			p.name = member_name(owner_id)
+			if _room:
+				_room.stop()
+				_room = null
 			lobby_joined.emit(lobby_id, ENTER_SUCCESS)
 		"deny":
 			var id := _joining
@@ -664,6 +783,12 @@ func _remove_member(id: int) -> bool:
 			members.remove_at(i)
 			return true
 	return false
+
+
+func _toast(text: String) -> void:
+	var t := get_node_or_null(^"/root/BuckdroidToast")
+	if t and t.has_method("show_text"):
+		t.show_text(text, 5.0)
 
 
 static func _now() -> float:
