@@ -28,9 +28,9 @@ static func to_etc2(data: PackedByteArray) -> PackedByteArray:
 	var source := Image.COMPRESS_SOURCE_GENERIC
 	if fmt == Image.FORMAT_DXT5_RA_AS_RG:
 		source = Image.COMPRESS_SOURCE_NORMAL
+	# Godot 4.6's decompressor already turns DXT5_RA_AS_RG (normal maps: X in red, Y in alpha) into a plain RG image
+	# (Image.convert_ra_rgba8_to_rg), so no swizzle here. (Godot 4.1's did not; tools/transcode_etc2.gd swaps itself.)
 	img.decompress()
-	if fmt == Image.FORMAT_DXT5_RA_AS_RG and img.get_format() == Image.FORMAT_RGBA8:
-		img = _ra_to_rg(img)
 	if mipmaps > 0 and not img.has_mipmaps():
 		img.generate_mipmaps(source == Image.COMPRESS_SOURCE_NORMAL)
 	if img.compress(Image.COMPRESS_ETC2, source) != OK:
