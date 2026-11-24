@@ -29,12 +29,20 @@
 ## 3. 60 fps cap on Android (see _ready).
 ##
 ## 4. Outdoor lights while inside (every platform: nothing visible changes). The multiplayer table scene keeps its two
-##    street lights (DirectionalLight3D "light_exterior moon" and "light_exterior wall", 4 shadow cascades each over the
-##    whole street) on during the match inside the club. Inside they add nothing visible (checked from six camera
+##    street lights ("light_exterior moon", a DirectionalLight3D with 4 shadow cascades over the whole street, and
+##    "light_exterior wall") on during the match inside the club. Inside they add nothing visible (checked from six camera
 ##    directions, including the window: only the club's own flashing lights differ between frames), but they were about
 ##    a quarter of the GPU time (PC, Mobile renderer, phone settings: 2.5 -> 1.9 ms; shadow pass 2.1 -> 1.7 million
 ##    triangles). They are hidden while the camera is inside the club's interior and shown again outside (the intro on
 ##    the street).
+##
+## 5. The room out of the table lights' shadows (every platform: nothing visible changes). The multiplayer table is lit
+##    by five fill lights over its corners and centre ("light_test*", "light_center", range about 27 units). Their
+##    shadows matter on the table (players, items: up to a quarter of the picture changes without them), but each
+##    redraw - every frame, since the players always move - also drew the club's walls, pipes, radiators and ceiling.
+##    Those dim lights' shadows of the room onto the room do not show (identical screenshots from five directions); the
+##    room's geometry gets visual layer ROOM_LAYER_BIT (cameras and lights include every layer, so it stays visible and
+##    lit) and the table lights leave it out of their shadow_caster_mask. About a third fewer shadow triangles.
 ##
 ## Phase 5 turns this into the Low / Medium / High presets.
 extends Node
@@ -128,7 +136,7 @@ func _ready() -> void:
 
 
 func _on_node_added(node: Node) -> void:
-	if node is DirectionalLight3D and String(node.name).begins_with(OUTDOOR_LIGHT_PREFIX):
+	if node is Light3D and String(node.name).begins_with(OUTDOOR_LIGHT_PREFIX):
 		_outdoor.append(node)
 	if node is Light3D:
 		_register.call_deferred(node)
@@ -261,7 +269,10 @@ func _track_dealer(mesh: MeshInstance3D) -> void:
 # --- 4. outdoor lights while inside ------------------------------------------------------------------------------------
 const OUTDOOR_LIGHT_PREFIX := "light_exterior"
 const INTERIOR_PREFIX := "interior environment main"   # the club interior's root node in the multiplayer scene
-var _outdoor: Array[DirectionalLight3D] = []
+const ROOM_PREFIXES := ["interior environment main", "interior upper main"]   # 5: the club's walls, pipes, ceiling
+const TABLE_LIGHT_PREFIXES := ["light_test", "light_center"]                    # 5: the table's fill lights
+const ROOM_LAYER_BIT := 1 << 19                                                 # visual layer 20, unused by the game
+var _outdoor: Array[Light3D] = []
 var _interior_box := AABB()
 var _interior_scene: Node
 var _outdoor_hidden := false
@@ -280,13 +291,36 @@ func _update_outdoor_lights() -> void:
 	if scene != _interior_scene:
 		_interior_scene = scene
 		_interior_box = _find_interior_box(scene)
+		if _interior_box.has_volume():
+			_room_out_of_table_shadows(scene)
 	var cam := get_viewport().get_camera_3d()
 	var inside := cam != null and _interior_box.has_volume() and _interior_box.has_point(cam.global_position)
+	if inside:
+		for l in _outdoor:
+			l.visible = false            # every frame: the game's flicker animation switches the wall light back on
 	if inside != _outdoor_hidden:
 		_outdoor_hidden = inside
 		for l in _outdoor:
 			l.visible = not inside
 		print("[buckdroid] outdoor lights %s (camera %s the club)" % ["hidden" if inside else "shown", "inside" if inside else "outside"])
+
+
+## 5: the room's geometry casts no shadow for the table's fill lights.
+func _room_out_of_table_shadows(scene: Node) -> void:
+	var marked := 0
+	for c in scene.get_children():
+		for prefix in ROOM_PREFIXES:
+			if String(c.name).begins_with(prefix):
+				for g in c.find_children("*", "GeometryInstance3D", true, false):
+					g.layers |= ROOM_LAYER_BIT
+					marked += 1
+	var lights := 0
+	for l in scene.find_children("*", "OmniLight3D", true, false):
+		for prefix in TABLE_LIGHT_PREFIXES:
+			if String(l.name).begins_with(prefix):
+				l.shadow_caster_mask &= ~ROOM_LAYER_BIT
+				lights += 1
+	print("[buckdroid] %d room objects out of %d table lights' shadows" % [marked, lights])
 
 
 ## The box around the club interior's geometry (world space), or an empty box if the scene has no such interior.

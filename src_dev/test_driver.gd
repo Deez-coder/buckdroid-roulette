@@ -98,6 +98,30 @@ func _run() -> void:
 				_log("joining lobby %d (lobby manager %s)" % [lid, lm != null])
 				if lm:
 					lm.join_lobby(lid)
+			"pos":  # pos <name substring, + for spaces>: class and world position of every 3D node whose name contains it
+				var pn := p[1].replace("+", " ")
+				for n in get_tree().current_scene.find_children("*" + pn + "*", "Node3D", true, false):
+					_log("pos %s %s %s visible=%s" % [n.get_class(), n.name, n.global_position, n.is_visible_in_tree()])
+			"castmask":  # castmask <light name prefix> <parent name prefix> <on|off>: whether geometry under scene children whose
+				# name starts with the parent prefix casts shadows for lights whose name starts with the light prefix
+				# (layer 20 + shadow_caster_mask; + for spaces)
+				var lp := p[1].replace("+", " ")
+				var gp := p[2].replace("+", " ")
+				var bit := 1 << 19
+				var marked := 0
+				for c in get_tree().current_scene.get_children():
+					if String(c.name).begins_with(gp):
+						for g in c.find_children("*", "GeometryInstance3D", true, false):
+							g.layers |= bit
+							marked += 1
+				var lights := 0
+				for l in get_tree().current_scene.find_children(lp + "*", "Light3D", true, false):
+					if p[3] == "off":
+						l.shadow_caster_mask &= ~bit
+					else:
+						l.shadow_caster_mask |= bit
+					lights += 1
+				_log("castmask: %d objects, %d lights, %s" % [marked, lights, p[3]])
 			"camturn":  # camturn <yaw degrees> <pitch degrees>: look around with a temporary camera at the game camera's place
 				# (the game sets its own camera every frame); "camturn reset" gives the view back to the game's camera
 				var game_cam: Camera3D = get_meta("bd_game_cam") if has_meta("bd_game_cam") else get_viewport().get_camera_3d()
