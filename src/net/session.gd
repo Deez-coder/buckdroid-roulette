@@ -41,6 +41,8 @@ const MSG_GAME := 2
 const MSG_CHAT := 3
 const STUN := ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"]
 const OFFER_RETRY := 4.0
+const REJOIN_GRACE := 20.0        # a dropped connection gets this long to come back before the game hears "left"
+const MAX_QUEUE := 512            # game messages held for a member while its connection comes back
 const ROOM_JOIN_TIMEOUT := 30.0   # the host may be in another app for a moment (sharing the code); Android pauses it
 const RoomSignal := preload("res://buckdroid/net/room_signal.gd")
 
@@ -81,6 +83,10 @@ var _direct_host := ""            # dev and tests: --bd-net-host=ip:port skips d
 var _no_lan := false              # tests: --bd-net-no-lan forces the internet path
 var _kicked: Array[int] = []
 var _room: RefCounted             # RoomSignal while hosting (new members) or joining (until welcomed)
+var _held := {}                   # host: member ID -> {since, queue} for members whose connection dropped
+var _rejoining := false           # member: the connection to the host dropped, reconnecting
+var _rejoin_until := 0.0
+var _outq: Array = []             # member: messages for the host held while reconnecting
 
 
 class Peer:
@@ -215,7 +221,12 @@ func join_lobby(id: int) -> void:
 
 func leave_lobby() -> void:
 	for key in _peers.keys():
+		if _peers[key].open:
+			_send_ctl(_peers[key], {"t": "bye"})     # leaving on purpose: no reconnect grace on the other side
 		_close_peer(_peers[key], false)
+	_held.clear()
+	_rejoining = false
+	_outq.clear()
 	_peers.clear()
 	if _server:
 		_server.stop()
@@ -279,10 +290,25 @@ func send_game(target: int, data: PackedByteArray) -> bool:
 	msg.encode_s64(9, target)
 	msg.append_array(data)
 	if is_host:
-		var p := _peer_by_id(target)
-		return p != null and _send(p, msg)
+		return _send_to_member(target, msg)
 	var host: Peer = _peers.get(0)
-	return host != null and _send(host, msg)
+	if _rejoining or host == null or not host.open:
+		if _rejoining and _outq.size() < MAX_QUEUE:
+			_outq.append(msg)
+			return true
+		return false
+	return _send(host, msg)
+
+
+## Host: send to a member, or hold the message while that member's connection comes back.
+func _send_to_member(id: int, msg: PackedByteArray) -> bool:
+	var p := _peer_by_id(id)
+	if p != null and p.open:
+		return _send(p, msg)
+	if _held.has(id) and _held[id].queue.size() < MAX_QUEUE:
+		_held[id].queue.append(msg)
+		return true
+	return false
 
 
 func available_packet_size() -> int:
@@ -329,7 +355,7 @@ func _process(delta: float) -> void:
 		var f: Dictionary = _found.get(_joining, {})
 		if not f.is_empty():
 			_connect_to_host(f.ip, f.port)       # on the same network: the direct local path wins
-		elif _now() - _join_started > ROOM_JOIN_TIMEOUT:
+		elif not _rejoining and _now() - _join_started > ROOM_JOIN_TIMEOUT:
 			if _join_peer:
 				_close_peer(_join_peer, false)
 				_peers.erase(0)
@@ -341,6 +367,18 @@ func _process(delta: float) -> void:
 		var p: Peer = _peers.get(key)
 		if p:
 			_poll_peer(p)
+	var now := _now()
+	if is_host:
+		for id in _held.keys():
+			if now - _held[id].since > REJOIN_GRACE:
+				print("[buckdroid] member did not come back in time")
+				_held.erase(id)
+				if _remove_member(id):
+					_broadcast_ctl({"t": "left", "id": id, "kicked": false})
+					member_changed.emit(lobby_id, id, STATE_LEFT)
+	elif _rejoining and now > _rejoin_until:
+		print("[buckdroid] could not reconnect to the host")
+		_give_up_host()
 
 
 func _poll_discovery(delta: float) -> void:
@@ -410,7 +448,7 @@ func _connect_to_host(ip: String, port: int) -> void:
 
 
 func _accept(tcp: StreamPeerTCP) -> void:
-	if _peers.size() >= member_limit - 1 or not joinable:
+	if _peers.size() >= member_limit - 1 or not (joinable or not _held.is_empty()):
 		tcp.disconnect_from_host()
 		return
 	var p := _new_peer()
@@ -479,7 +517,7 @@ func _on_room(from: String, m: Dictionary) -> void:
 			p = q
 	if is_host:
 		if p == null:
-			if t != "sdp" or str(m.get("type", "")) != "offer" or not joinable or _peers.size() >= member_limit - 1:
+			if t != "sdp" or str(m.get("type", "")) != "offer" or not (joinable or not _held.is_empty()) 					or _peers.size() >= member_limit - 1:
 				return
 			p = _new_peer(true)
 			p.key = _next_key
@@ -534,6 +572,11 @@ func _poll_peer(p: Peer) -> void:
 			if not is_host and _joining != 0:
 				if p.via_room and p.room_sid == "":
 					return                       # nobody answered yet: the lobby timeout above decides
+				if _rejoining:
+					_close_peer(p, false)        # this attempt failed; the next one starts on the next frame
+					_peers.erase(0)
+					_join_peer = null
+					return
 				var id := _joining
 				_joining = 0
 				_close_peer(p, false)
@@ -553,16 +596,24 @@ func _poll_peer(p: Peer) -> void:
 	while p.ch.get_available_packet_count() > 0:
 		var raw := p.ch.get_packet()
 		if not _rate_ok(p, raw.size()):
-			print("[buckdroid] dropping a member that sends too much")
-			_drop(p, true)
+			_drop(p, true, "sends too much")
 			return
 		_receive(p, raw)
 		if not _peers.has(p.key):
 			return
 	var now := _now()
 	var cs := p.pc.get_connection_state()
-	if cs == WebRTCPeerConnection.STATE_FAILED or cs == WebRTCPeerConnection.STATE_CLOSED or p.ch.get_ready_state() == WebRTCDataChannel.STATE_CLOSED or now - p.last_heard > PEER_TIMEOUT:
-		_drop(p, false)
+	var why := ""
+	if cs == WebRTCPeerConnection.STATE_FAILED:
+		why = "connection failed"
+	elif cs == WebRTCPeerConnection.STATE_CLOSED:
+		why = "connection closed"
+	elif p.ch.get_ready_state() == WebRTCDataChannel.STATE_CLOSED:
+		why = "data channel closed"
+	elif now - p.last_heard > PEER_TIMEOUT:
+		why = "silent for %d s" % int(now - p.last_heard)
+	if why != "":
+		_drop(p, false, why)
 		return
 	if not p.has_meta("hb") or now - float(p.get_meta("hb")) > HEARTBEAT_EVERY:
 		p.set_meta("hb", now)
@@ -605,9 +656,7 @@ func _receive(p: Peer, raw: PackedByteArray) -> void:
 				if target == my_id:
 					_inbox.append([sender, data])
 				else:
-					var q := _peer_by_id(target)
-					if q:
-						_send(q, raw)          # forwarded unchanged: the target sees the real sender
+					_send_to_member(target, raw)   # forwarded unchanged: the target sees the real sender
 			else:
 				if _is_member(sender):
 					_inbox.append([sender, data])
@@ -642,7 +691,23 @@ func _on_ctl(p: Peer, m: Dictionary) -> void:
 		return
 	if t == "pong":
 		return
+	if t == "bye":
+		p.set_meta("bye", true)
+		_drop(p, false, "left")
+		return
 	if is_host:
+		if t == "hello" and p.id == 0 and _held.has(int(m.get("id", 0))):
+			# A member whose connection dropped is back: same seat, and what was held for it goes out now.
+			var rid := int(m.get("id", 0))
+			p.id = rid
+			p.name = member_name(rid)
+			_send_ctl(p, {"t": "welcome", "lobby": lobby_id, "owner": my_id, "members": members, "data": lobby_data,
+					"limit": member_limit, "rejoin": true})
+			for msg in _held[rid].queue:
+				_send(p, msg)
+			print("[buckdroid] member reconnected after %.1f s (%d held messages)" % [_now() - _held[rid].since, _held[rid].queue.size()])
+			_held.erase(rid)
+			return
 		if t == "hello" and p.id == 0:
 			var id := int(m.get("id", 0))
 			var deny := 0
@@ -650,8 +715,8 @@ func _on_ctl(p: Peer, m: Dictionary) -> void:
 				deny = ENTER_ERROR
 			elif str(m.get("ver", "")) != game_version:
 				deny = ENTER_NOT_ALLOWED
-			elif id <= 0 or _is_member(id) or id in _kicked:
-				deny = ENTER_NOT_ALLOWED
+			elif id <= 0 or _is_member(id) or id in _kicked or not joinable:
+				deny = ENTER_NOT_ALLOWED       # (not joinable: the match has started; only held seats come back)
 			elif members.size() >= member_limit:
 				deny = ENTER_FULL
 			if deny != 0:
@@ -672,6 +737,9 @@ func _on_ctl(p: Peer, m: Dictionary) -> void:
 	# member side
 	match t:
 		"welcome":
+			if _rejoining:
+				_finish_rejoin(p, m)
+				return
 			var id := _joining
 			_joining = 0
 			lobby_id = int(m.get("lobby", id))
@@ -693,6 +761,11 @@ func _on_ctl(p: Peer, m: Dictionary) -> void:
 				_room = null
 			lobby_joined.emit(lobby_id, ENTER_SUCCESS)
 		"deny":
+			if _rejoining:
+				_close_peer(p, false)
+				_peers.erase(0)
+				_give_up_host()
+				return
 			var id := _joining
 			_joining = 0
 			_close_peer(p, false)
@@ -713,24 +786,82 @@ func _on_ctl(p: Peer, m: Dictionary) -> void:
 			lobby_data[str(m.get("k", ""))] = str(m.get("v", ""))
 
 
-func _drop(p: Peer, kicked: bool) -> void:
+func _drop(p: Peer, kicked: bool, why := "") -> void:
 	var id := p.id
+	var on_purpose := kicked or p.has_meta("bye")
 	_close_peer(p, false)
 	_peers.erase(p.key)
 	if is_host:
-		if id != 0 and _remove_member(id):
-			if kicked:
-				_kicked.append(id)
-			_broadcast_ctl({"t": "left", "id": id, "kicked": kicked})
-			member_changed.emit(lobby_id, id, STATE_KICKED if kicked else STATE_LEFT)
+		if id == 0 or not _is_member(id):
+			return
+		if not on_purpose:
+			# Keep the seat: the member's game reconnects through the room (mobile networks drop connections).
+			print("[buckdroid] lost a member (%s), holding its seat for %d s" % [why, int(REJOIN_GRACE)])
+			_held[id] = {"since": _now(), "queue": []}
+			return
+		print("[buckdroid] member gone (%s)" % why)
+		_remove_member(id)
+		if kicked:
+			_kicked.append(id)
+		_broadcast_ctl({"t": "left", "id": id, "kicked": kicked})
+		member_changed.emit(lobby_id, id, STATE_KICKED if kicked else STATE_LEFT)
 	elif lobby_id != 0:
-		# The host is gone: the lobby ends. Tell the game every other member left, and keep it as a lobby of one.
-		print("[buckdroid] lost the connection to the host")
-		for mm in members.duplicate():
-			if mm.id != my_id:
-				_remove_member(mm.id)
-				member_changed.emit(lobby_id, mm.id, STATE_LEFT)
-		owner_id = my_id
+		if on_purpose or _rejoining:
+			print("[buckdroid] the host is gone (%s)" % why)
+			_give_up_host()
+			return
+		# Reconnect through the room (and the local network) to the same host; the game does not notice.
+		print("[buckdroid] lost the connection to the host (%s), reconnecting" % why)
+		_rejoining = true
+		_rejoin_until = _now() + REJOIN_GRACE
+		_join_peer = null
+		_joining = lobby_id
+		_join_started = _now()
+		_start_listening()
+		_start_room(lobby_id)
+
+
+## Member: the host could not be reached again. The lobby ends: tell the game every other member left.
+func _give_up_host() -> void:
+	_rejoining = false
+	_outq.clear()
+	_joining = 0
+	if _room:
+		_room.stop()
+		_room = null
+	for mm in members.duplicate():
+		if mm.id != my_id:
+			_remove_member(mm.id)
+			member_changed.emit(lobby_id, mm.id, STATE_LEFT)
+	owner_id = my_id
+
+
+## Member: back in after a dropped connection. Catch up on members that came or went, then send what was held.
+func _finish_rejoin(p: Peer, m: Dictionary) -> void:
+	var before := {}
+	for mm in members:
+		before[mm.id] = mm.name
+	members.clear()
+	for e in m.get("members", []):
+		if e is Dictionary:
+			members.append({"id": int(e.get("id", 0)), "name": _clean_name(str(e.get("name", "")))})
+	for mm in members:
+		if not before.has(mm.id):
+			member_changed.emit(lobby_id, mm.id, STATE_ENTERED)
+		before.erase(mm.id)
+	for gone in before:
+		member_changed.emit(lobby_id, gone, STATE_LEFT)
+	p.id = owner_id
+	p.name = member_name(owner_id)
+	_joining = 0
+	_rejoining = false
+	if _room:
+		_room.stop()
+		_room = null
+	print("[buckdroid] reconnected to the host (%d held messages)" % _outq.size())
+	for msg in _outq:
+		_send(p, msg)
+	_outq.clear()
 
 
 func kick(id: int) -> void:

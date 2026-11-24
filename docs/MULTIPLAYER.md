@@ -156,3 +156,14 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   and the PC on home Wi-Fi joining: direct connection, lobby joined.
 - The lobby screen shows the lobby ID as text, in groups of four, in the lobby's own font (BuckdroidBoot; user request).
 - `tools/refresh_payload.py` swaps our scripts into an already converted pack (developer testing on the own phone).
+
+## Reconnects (2026-11-24)
+- First long phone (mobile data) - PC match: both sides lost the direct connection after about 6.5 minutes at the same
+  moment, neither app in the background; most likely the carrier's NAT reassigned the phone's public address/port.
+- Now: a member whose connection drops keeps its seat for 20 s (`REJOIN_GRACE`); its game reconnects through the room
+  (and the local network) to the same host, and messages for it are held (up to 512) and delivered when it is back. The
+  game only hears "left" if it does not come back in time. Leaving on purpose sends "bye" (no grace). While a seat is
+  held the host accepts connections even during a match (newcomers are still refused once the match has started).
+  Every drop logs its reason (connection failed/closed, data channel closed, silence).
+- Test: two PC copies over the internet path, joiner's connection cut mid-match (test driver `netcut`): reconnected in
+  2.0 s, 1 held message delivered, the game did not notice.

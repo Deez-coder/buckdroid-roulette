@@ -98,6 +98,12 @@ func _run() -> void:
 				_log("joining lobby %d (lobby manager %s)" % [lid, lm != null])
 				if lm:
 					lm.join_lobby(lid)
+			"netcut":  # netcut: break this copy's WebRTC connections, as a mobile network dropping them would
+				var netc := get_node_or_null(^"/root/BuckdroidNet")
+				if netc:
+					for pp in netc._peers.values():
+						pp.pc.close()
+					_log("netcut: closed %d connections" % netc._peers.size())
 			"net":  # net: log the multiplayer state
 				var net := get_node_or_null(^"/root/BuckdroidNet")
 				var gs := get_node_or_null(^"/root/GlobalSteam")
