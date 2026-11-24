@@ -24,8 +24,17 @@
 ##    Measured on the Galaxy S24 Ultra (Forward+), frame rate at the dealer intro / idle table:
 ##      cube 39 / 43 fps (dealer's face matches the PC), mixed 60 / 71 fps (face very close, same shading pattern),
 ##      paraboloid - / 96 fps (shadow pattern on the face visibly shifts). Hence "mixed" as the Android default.
+##    The multiplayer table has no dealer, so "mixed" gives every light there dual-paraboloid shadows (see _register).
 ##
 ## 3. 60 fps cap on Android (see _ready).
+##
+## 4. Outdoor lights while inside (every platform: nothing visible changes). The multiplayer table scene keeps its two
+##    street lights (DirectionalLight3D "light_exterior moon" and "light_exterior wall", 4 shadow cascades each over the
+##    whole street) on during the match inside the club. Inside they add nothing visible (checked from six camera
+##    directions, including the window: only the club's own flashing lights differ between frames), but they were about
+##    a quarter of the GPU time (PC, Mobile renderer, phone settings: 2.5 -> 1.9 ms; shadow pass 2.1 -> 1.7 million
+##    triangles). They are hidden while the camera is inside the club's interior and shown again outside (the intro on
+##    the street).
 ##
 ## Phase 5 turns this into the Low / Medium / High presets.
 extends Node
@@ -33,6 +42,7 @@ extends Node
 const KEY_LIGHT_ENERGY := 15.0      # omni lights at or above this initial energy count as key lights
 const ZERO_ENERGY := 0.01
 const ANDROID_DEFAULT_MODE := "mixed"
+const MULTIPLAYER_SCENE_ROOT := "/root/mp_main/"
 
 const MODES := ["cube", "mixed", "adaptive", "key_only", "paraboloid"]
 const DEALER_HEAD_NODE := &"dealer head mesh"   # the dealer's head mesh in the game's main scene
@@ -118,6 +128,8 @@ func _ready() -> void:
 
 
 func _on_node_added(node: Node) -> void:
+	if node is DirectionalLight3D and String(node.name).begins_with(OUTDOOR_LIGHT_PREFIX):
+		_outdoor.append(node)
 	if node is Light3D:
 		_register.call_deferred(node)
 	elif node is GeometryInstance3D and _is_shadow_excluded(node):
@@ -151,7 +163,12 @@ func _register(light: Light3D) -> void:
 	if not is_instance_valid(light) or not light.shadow_enabled or _lights.has(light):
 		return
 	_lights.append(light)
-	if light is OmniLight3D and light.light_energy >= KEY_LIGHT_ENERGY:
+	# Key lights (cube shadows in "mixed") exist to keep the dealer's face as on the PC. The multiplayer table has no
+	# dealer: there its strong lights (the club's overhead lights and the room light) are treated like the others.
+	# Measured (PC, Mobile renderer, frozen frame): shadow pass about 30% fewer triangles than with them as key lights,
+	# and the picture differs only in the soft falloff in a few dark corners.
+	var in_multiplayer := String(light.get_path()).begins_with(MULTIPLAYER_SCENE_ROOT)
+	if light is OmniLight3D and light.light_energy >= KEY_LIGHT_ENERGY and not in_multiplayer:
 		_key[light.get_instance_id()] = true
 	_apply_mode(light)
 
@@ -241,7 +258,59 @@ func _track_dealer(mesh: MeshInstance3D) -> void:
 		print("[buckdroid] dealer bones: ", names)
 
 
+# --- 4. outdoor lights while inside ------------------------------------------------------------------------------------
+const OUTDOOR_LIGHT_PREFIX := "light_exterior"
+const INTERIOR_PREFIX := "interior environment main"   # the club interior's root node in the multiplayer scene
+var _outdoor: Array[DirectionalLight3D] = []
+var _interior_box := AABB()
+var _interior_scene: Node
+var _outdoor_hidden := false
+
+
+func _update_outdoor_lights() -> void:
+	var i := 0
+	while i < _outdoor.size():
+		if not is_instance_valid(_outdoor[i]):
+			_outdoor.remove_at(i)
+		else:
+			i += 1
+	if _outdoor.is_empty():
+		return
+	var scene := get_tree().current_scene
+	if scene != _interior_scene:
+		_interior_scene = scene
+		_interior_box = _find_interior_box(scene)
+	var cam := get_viewport().get_camera_3d()
+	var inside := cam != null and _interior_box.has_volume() and _interior_box.has_point(cam.global_position)
+	if inside != _outdoor_hidden:
+		_outdoor_hidden = inside
+		for l in _outdoor:
+			l.visible = not inside
+		print("[buckdroid] outdoor lights %s (camera %s the club)" % ["hidden" if inside else "shown", "inside" if inside else "outside"])
+
+
+## The box around the club interior's geometry (world space), or an empty box if the scene has no such interior.
+func _find_interior_box(scene: Node) -> AABB:
+	if scene == null:
+		return AABB()
+	var root: Node = null
+	for n in scene.get_children():
+		if String(n.name).begins_with(INTERIOR_PREFIX):
+			root = n
+			break
+	if root == null:
+		return AABB()
+	var box := AABB()
+	var first := true
+	for g in root.find_children("*", "VisualInstance3D", true, false):
+		var b: AABB = g.global_transform * g.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+
 func _process(_delta: float) -> void:
+	_update_outdoor_lights()
 	if not skip_zero_energy:
 		return
 	var i := 0

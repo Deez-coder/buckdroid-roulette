@@ -98,6 +98,31 @@ func _run() -> void:
 				_log("joining lobby %d (lobby manager %s)" % [lid, lm != null])
 				if lm:
 					lm.join_lobby(lid)
+			"camturn":  # camturn <yaw degrees> <pitch degrees>: look around with a temporary camera at the game camera's place
+				# (the game sets its own camera every frame); "camturn reset" gives the view back to the game's camera
+				var game_cam: Camera3D = get_meta("bd_game_cam") if has_meta("bd_game_cam") else get_viewport().get_camera_3d()
+				if has_meta("bd_test_cam"):
+					var old: Camera3D = get_meta("bd_test_cam")
+					if is_instance_valid(old):
+						old.queue_free()
+					remove_meta("bd_test_cam")
+				if p[1] == "reset":
+					if is_instance_valid(game_cam):
+						game_cam.make_current()
+					remove_meta("bd_game_cam")
+				elif game_cam:
+					set_meta("bd_game_cam", game_cam)
+					var tc := Camera3D.new()
+					get_tree().current_scene.add_child(tc)
+					tc.fov = game_cam.fov
+					tc.near = game_cam.near
+					tc.far = game_cam.far
+					tc.global_transform = game_cam.global_transform
+					tc.global_basis = Basis(Vector3.UP, deg_to_rad(float(p[1]))) * tc.global_basis
+					tc.rotate_object_local(Vector3.RIGHT, deg_to_rad(float(p[2])))
+					tc.make_current()
+					set_meta("bd_test_cam", tc)
+					_log("camturn %s %s: looking %s" % [p[1], p[2], -tc.global_basis.z])
 			"netcut":  # netcut: break this copy's WebRTC connections, as a mobile network dropping them would
 				var netc := get_node_or_null(^"/root/BuckdroidNet")
 				if netc:
