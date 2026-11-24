@@ -20,6 +20,10 @@
 ## ("buckdroid_any_button") that the UI ignores. Only the screens listed in ANY_BUTTON_SCREENS get it, because other
 ## screens (the key-rebinding menu) would capture it.
 ##
+## Direct mode: bigger hit areas (controls.ini: tap_assist = on | off, default off). If a tap lands on nothing the
+##   game can use, the nearest usable object within ASSIST_RADII is tapped instead, found with the same kind of camera
+##   raycast the game uses. Small items and buttons get easier to hit with a finger.
+##
 ## Only the first finger acts as the mouse.
 extends Node
 
@@ -30,10 +34,13 @@ const ANY_BUTTON_ACTION := &"buckdroid_any_button"
 ## script file -> property that is true while that screen waits for "any button"
 const ANY_BUTTON_SCREENS := {"EndingManager.gd": "waitingForInput"}
 const CURSOR_HOTSPOTS := {"point": Vector2(12, 0), "hover": Vector2(9, 0), "invalid": Vector2(12, 0)}
+const ASSIST_RADII := [10.0, 20.0, 32.0]             # base pixels (the game draws at 960x540)
+const ASSIST_DIRECTIONS := 12
 
 var mode := "direct"
 var cursor_speed := 1.0           # controls.ini cursor_speed: cursor movement per finger movement (0.25 - 4)
 var cursor_size := 1.0            # controls.ini cursor_size: cursor image scale (0.5 - 3)
+var tap_assist := false           # controls.ini tap_assist
 
 var _queue: Array = []             # [{frames_left: int, event: InputEvent}]
 var _finger_down := false
@@ -51,6 +58,7 @@ var _rel_moved := 0.0
 var _any_screens: Array[Node] = []
 var _cursor_manager: Node = null
 var _interaction_manager: Node = null
+var _raycast_camera: Camera3D = null  # the game's MouseRaycast camera
 
 # cursor overlay
 var _layer: CanvasLayer
@@ -84,6 +92,7 @@ func _read_settings() -> void:
 	mode = m if m in ["direct", "relative"] else "direct"
 	cursor_speed = clampf(settings.get_float("controls", "cursor_speed", 1.0), 0.25, 4.0)
 	cursor_size = clampf(settings.get_float("controls", "cursor_size", 1.0), 0.5, 3.0)
+	tap_assist = settings.get_value("controls", "tap_assist") == "on"
 
 
 # --- input ---------------------------------------------------------------------------------------------------------
@@ -104,7 +113,8 @@ func _input_direct(event: InputEvent) -> void:
 			_press_sent = false
 			_release_pending = null
 			_move_to(event.position)
-			_queue.append({"frames_left": HOVER_FRAMES, "event": _button(event.position, true)})
+			_queue.append({"frames_left": HOVER_FRAMES, "event": _button(event.position, true),
+					"base_pos": event.position, "assist": tap_assist})
 			_notify_any_button()
 		elif _finger_down:
 			_finger_down = false
@@ -145,6 +155,11 @@ func _process(_delta: float) -> void:
 			item.frames_left -= 1
 			still.append(item)
 			continue
+		if item.has("base_pos"):
+			var verdict := _check_press(item)
+			if verdict == "retry":
+				still.append(item)
+				continue
 		if _debug:
 			print("[bd-touch] send ", item.event)
 		Input.parse_input_event(item.event)
@@ -185,6 +200,70 @@ func _button(pos: Vector2, pressed: bool) -> InputEventMouseButton:
 	return b
 
 
+# --- bigger hit areas ------------------------------------------------------------------------------------------------
+
+## Decides what to do with a press about to be sent: "send", or "retry" when the pointer was moved to an assisted
+## target (the press waits until the game has noticed what is under the pointer).
+func _check_press(item: Dictionary) -> String:
+	var branch = _hover_branch()
+	if branch == null and item.get("assist", false):
+		item["assist"] = false
+		var target = _find_assist_target(item["base_pos"])
+		if target != null:
+			_move_to(target)
+			item["event"] = _button(target, true)
+			item["base_pos"] = target
+			item["frames_left"] = HOVER_FRAMES
+			if _release_pending:
+				_release_pending = _button(target, false)
+			return "retry"
+	return "send"
+
+
+## The game's current usable hover target (InteractionBranch), or null.
+func _hover_branch():
+	if not is_instance_valid(_interaction_manager):
+		return null
+	var branch = _interaction_manager.get("activeInteractionBranch")
+	if branch == null or not is_instance_valid(branch):
+		return null
+	if branch.get("interactionAllowed") != true or branch.get("interactionInvalid") == true:
+		return null
+	return branch
+
+
+## Nearest point around base_pos whose raycast hits an object the game can interact with right now.
+func _find_assist_target(base_pos: Vector2):
+	if not is_instance_valid(_raycast_camera) or not _raycast_camera.is_inside_tree():
+		return null
+	if is_instance_valid(_cursor_manager) and _cursor_manager.get("cursor_visible") == false:
+		return null
+	for r in ASSIST_RADII:
+		for k in ASSIST_DIRECTIONS:
+			var a := TAU * k / ASSIST_DIRECTIONS
+			var p: Vector2 = base_pos + Vector2(cos(a), sin(a)) * r
+			if _usable_at(p):
+				return p
+	return null
+
+
+func _usable_at(p: Vector2) -> bool:
+	var space := _raycast_camera.get_world_3d().direct_space_state
+	var from := _raycast_camera.project_ray_origin(p)
+	var to := _raycast_camera.project_position(p, 20000)
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to))
+	if hit.is_empty() or hit.collider == null:
+		return false
+	var parent: Node = hit.collider.get_parent()
+	if parent == null:
+		return false
+	for c in parent.get_children():
+		var sc: Script = c.get_script()
+		if sc and sc.resource_path.get_file() == "InteractionBranch.gd":
+			return c.get("interactionAllowed") == true and c.get("interactionInvalid") != true
+	return false
+
+
 # --- "press any button" screens ------------------------------------------------------------------------------------
 
 func _on_node_added(node: Node) -> void:
@@ -198,6 +277,8 @@ func _on_node_added(node: Node) -> void:
 		_cursor_manager = node
 	elif file == "InteractionManager.gd":
 		_interaction_manager = node
+	elif file == "MouseRaycast.gd":
+		_raycast_camera = node
 
 
 func _notify_any_button() -> void:

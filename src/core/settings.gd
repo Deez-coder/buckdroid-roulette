@@ -19,7 +19,7 @@ signal controls_changed
 
 const DEFAULTS := {
 	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": "", "thermal_guard": ""},   # "" = let BuckdroidRender pick the platform default
-	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00"},
+	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00", "tap_assist": "off"},
 }
 
 var config_dir := "user://config"
@@ -123,6 +123,8 @@ touch_mode = direct
 cursor_speed = 1.00
 ; Cursor size in relative mode (0.5 - 3).
 cursor_size = 1.00
+; Direct mode: a tap that misses goes to the nearest object you can use (easier to hit small items). on or off.
+tap_assist = off
 """,
 }
 
