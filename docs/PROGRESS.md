@@ -190,3 +190,16 @@ Note: the first BuckdroidCompat test run stopped after the menu screenshot (no s
 **Next:** real-play heat session on 4.6 with the user, user playthrough check (menus, all items, endings, endless mode), then Phase 4 controls.
 
 **Heat session 6 (2026-11-24, Godot 4.6.3, short: 6 min of play from 34.2 °C):** skin 36.5 °C, AP 39.0, status 0. fps 60.2, under 55 fps 1%, GPU 12.7 ms (session 5 on 4.1: 12.9), shadow draws/frame 423 (772), median worst frame 20.4 ms (22.1), logger cpu_ms 18.4 (28.4; includes waiting, indicative only). Too short for a temperature comparison; a full 15-20 min session from ~33 °C is still needed.
+
+## Optimization round on 4.6 (2026-11-24, user away; *choice* = decided by Claude)
+
+Research (Godot docs, Android ADPF guide, Arm/Qualcomm notes, earlier Arm Godot posts): on phones the Mobile renderer is the efficient path (no clustered lighting, subpasses, FP16 since 4.5); frame pacing via Swappy is strongly recommended by Godot's own build ("without Swappy ... there will be stutter"); thermal headroom (ADPF) should drive gentle quality steps before throttling; resolution is the main heat lever, then shadows.
+
+Done:
+- *choice* **Swappy frame pacing compiled in** (`swappy=yes`, Godot's `misc/scripts/install_swappy_android.py`, official godot-swappy release). Our earlier 4.6 builds had none. Default mode `display/window/frame_pacing/android/swappy_mode` = 2 (auto).
+- *choice* **Heat guard** `src/render/thermal_guard.gd` (autoload BuckdroidThermal, graphics.ini `thermal_guard`, default on): reads `PowerManager.getThermalHeadroom(10)` and `getCurrentThermalStatus()` every 10 s through Godot's built-in AndroidRuntime plugin (no engine change); at headroom >= 0.95 lowers the 3D scale by 0.1 (min 0.7), restores after 60 s below 0.80. Headroom/status/3D scale now in telemetry (`thermal_headroom,thermal_status,scale_3d`) and in the fps overlay ("heat 0.62"). First reliable heat signal from inside the app. Untested on the phone yet.
+- CPU profiling on the PC (test-driver `perfmon`, `procscan`, `animscan`, `treescan`): per-frame process time ~5 ms on the desktop CPU, but no script or scene part stands out (all < 0.1-0.5 ms, noise ±0.3 ms); our autoloads are negligible; animations ~0.4 ms. *choice*: not chasing it further.
+- Mobile renderer on 4.6 (PC): with `transparency_fallback` on (auto does this for non-Forward+ renderers) the in-game image matches Forward+ (mean difference ~1 level); fades pop instead of fading. The 4.1-era Adreno face-shadow loss must be re-checked on the phone. *choice*: candidate for an optional "cool" renderer setting, not the default.
+- `.work/abtest.sh` (needs the phone): installs the Swappy build, then base / Mobile renderer / separate render thread (`rendering/driver/threads/thread_model=2`) / both / base again, each with a frozen dealer close-up (face-shadow check) and GPU clock x busy plus the game's CPU time (now sampled from /proc/<pid>/stat by `.work/gpusample.sh`).
+
+Next when the phone is back: run `bash .work/abtest.sh` (~25 min, unattended), check thermal guard log lines and telemetry columns, then a full heat session.
