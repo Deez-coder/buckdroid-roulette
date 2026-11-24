@@ -10,6 +10,6 @@ set "ANDROID_HOME=%ROOT%\.cache\android\sdk"
 set "ANDROID_SDK_ROOT=%ROOT%\.cache\android\sdk"
 set "PATH=%JAVA_HOME%\bin;%SCONS_DIR%;%PATH%"
 cd /d "%~dp0godot46"
-python -m SCons platform=android target=template_debug arch=arm64 disable_path_overrides=no -j12 || exit /b 1
+python -m SCons platform=android target=template_debug arch=arm64 disable_path_overrides=no swappy=yes -j12 || exit /b 1
 cd platform\android\java
 call .\gradlew.bat generateGodotTemplates || exit /b 1
