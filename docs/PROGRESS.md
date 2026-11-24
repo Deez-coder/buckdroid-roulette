@@ -268,3 +268,11 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
     dark corners differs. PC "cube" mode keeps the original look.
   - Tried and dropped: mesh_detail / LOD (about 1% fewer shadow triangles), excluding the street's geometry from the
     indoor lights' shadows (Godot already culls it: no change).
+  - *choice* The room's geometry (walls, pipes, radiators, ceiling) left out of the five table fill lights' shadows via
+    shadow_caster_mask: identical screenshots from five directions; with the two changes above the shadow pass went
+    from 2.12 to 1.36 million triangles per frame (PC GPU 2.5 -> 1.9 ms). The table lights' shadows themselves stay:
+    without them up to a quarter of the table view changes. The outdoor wall light is a SpotLight3D whose flicker
+    animation turns it back on: now re-hidden every frame while inside.
+  - CPU: no game script or animation is measurably expensive (procscan, animscan, treescan); the phone's higher CPU in
+    the match is most likely the renderer recording the shadow passes, which the changes above also reduce.
+  - Not measured on the phone yet (it was disconnected): next heat run in a multiplayer match.
