@@ -38,6 +38,7 @@ AUTOLOADS = [
     ("BuckdroidTouch", "input/touch_adapter.gd"),
     ("BuckdroidTransparencyFallback", "render/transparency_fallback.gd"),
     ("BuckdroidRender", "render/render_settings.gd"),
+    ("BuckdroidThermal", "render/thermal_guard.gd"),
     ("BuckdroidPerfOverlay", "render/perf_overlay.gd"),
     ("BuckdroidIdlePacing", "render/idle_pacing.gd"),
     ("BuckdroidTelemetry", "core/telemetry.gd"),

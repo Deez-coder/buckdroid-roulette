@@ -18,7 +18,7 @@ extends Node
 signal controls_changed
 
 const DEFAULTS := {
-	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": ""},   # "" = let BuckdroidRender pick the platform default
+	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": "", "thermal_guard": ""},   # "" = let BuckdroidRender pick the platform default
 	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00"},
 }
 
@@ -106,6 +106,9 @@ shadow_resolution =
 shadow_softness =
 ; Mesh detail: 1.0 (original). Higher (e.g. 2.0) uses simpler versions of small or distant objects; saves a few percent.
 mesh_detail =
+; Heat guard: when Android reports the phone is about to throttle, lower the 3D resolution a step (back up once it
+; cools). Normal play is unaffected. on (default) or off.
+thermal_guard =
 ; Fallback that hides fading objects on renderers that ignore their fade: auto, on or off.
 transparency_fallback = auto
 ; Diagnostics for testers: write performance and temperature logs to the telemetry folder (on or off).

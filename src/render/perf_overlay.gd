@@ -64,6 +64,12 @@ func _process(delta: float) -> void:
 			Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
 			ProjectSettings.get_setting("rendering/renderer/rendering_method"), shadow_mode,
 			str(Engine.max_fps) if Engine.max_fps > 0 else "off"]
+	var thermal := get_node_or_null(^"/root/BuckdroidThermal")
+	if thermal and thermal.headroom >= 0.0:
+		# Android's thermal headroom: 1.0 = about to throttle. 3D scale shows when the heat guard eased it.
+		_label.text += "
+heat %.2f  status %d  3D %.0f%%" % [thermal.headroom, thermal.status,
+				get_tree().root.scaling_3d_scale * 100.0]
 	_frames = 0
 	_worst = 0.0
 	_gpu_total = 0.0

@@ -46,7 +46,7 @@ func _ready() -> void:
 	var stamp := Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
 	_path = dir.path_join("session_%s.csv" % stamp)
 	_find_temperature_sources()
-	var header := "time,uptime_s,scene,fps,avg_ms,worst_ms,gpu_ms,cpu_ms,fps_cap,idle,draws,shadow_draws,mem_mb,vram_mb"
+	var header := "time,uptime_s,scene,fps,avg_ms,worst_ms,gpu_ms,cpu_ms,fps_cap,idle,draws,shadow_draws,mem_mb,vram_mb,thermal_headroom,thermal_status,scale_3d"
 	for s in _sources:
 		header += ",temp_" + s[0]
 	_append(header)
@@ -90,6 +90,10 @@ func _write_line() -> void:
 					RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
 			OS.get_static_memory_usage() / 1048576,
 			int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0)]
+	# Android's own thermal readings (BuckdroidThermal); the app cannot read temperature sensors directly.
+	var thermal := get_node_or_null(^"/root/BuckdroidThermal")
+	line += ",%.3f,%d,%.2f" % [thermal.headroom if thermal else -1.0, thermal.status if thermal else -1,
+			get_tree().root.scaling_3d_scale]
 	for s in _sources:
 		line += ",%.1f" % _read_temp(s)
 	_append(line)

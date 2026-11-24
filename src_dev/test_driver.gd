@@ -187,6 +187,109 @@ func _run() -> void:
 						mi.mesh = nm
 						rc += 1
 				_log("remesh %s: %d meshes in %d ms" % [rn, rc, Time.get_ticks_msec() - t0])
+			"procscan":  # procscan <frames>: for every script whose nodes run _process, pause those nodes for <frames>
+				# frames and log how much the per-frame script time drops (finds the expensive game scripts)
+				var groups := {}
+				for nd in get_tree().root.find_children("*", "Node", true, false):
+					if nd.is_processing() and nd.get_script() != null and nd != self:
+						var sp: String = nd.get_script().resource_path
+						if not groups.has(sp):
+							groups[sp] = []
+						groups[sp].append(nd)
+				var frames := int(p[1])
+				var measure := func() -> float:
+					var tot := 0.0
+					for i in frames:
+						await get_tree().process_frame
+						tot += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+					return tot / frames
+				var results := []
+				await measure.call()   # warm-up window, discarded
+				for sp in groups:
+					var before: float = await measure.call()
+					for nd in groups[sp]:
+						if is_instance_valid(nd):
+							nd.set_process(false)
+					var during: float = await measure.call()
+					for nd in groups[sp]:
+						if is_instance_valid(nd):
+							nd.set_process(true)
+					var after: float = await measure.call()
+					results.append([(before + after) / 2.0 - during, sp, groups[sp].size()])
+				results.sort_custom(func(a, b): return a[0] > b[0])
+				for r in results.slice(0, 15):
+					_log("procscan %.2f ms  %s  (%d nodes)" % [r[0], r[1], r[2]])
+				_log("procscan done: %d scripts" % groups.size())
+			"treescan":  # treescan <frames>: pause each top-level child of the scene (and each autoload) in turn and log how
+				# much per-frame process time drops; covers scripts, animations and engine-internal processing alike
+				var tops: Array = get_tree().current_scene.get_children()
+				for c in get_tree().root.get_children():
+					if c != get_tree().current_scene and c != self:
+						tops.append(c)
+				var tm := func() -> float:
+					var tot := 0.0
+					for i in int(p[1]):
+						await get_tree().process_frame
+						tot += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+					return tot / int(p[1])
+				await tm.call()
+				var res := []
+				for c in tops:
+					if not is_instance_valid(c):
+						continue
+					var b: float = await tm.call()
+					var old_mode: int = c.process_mode
+					c.process_mode = Node.PROCESS_MODE_DISABLED
+					var d: float = await tm.call()
+					c.process_mode = old_mode
+					var a: float = await tm.call()
+					res.append([(b + a) / 2.0 - d, String(c.name)])
+				res.sort_custom(func(x, y): return x[0] > y[0])
+				for r in res.slice(0, 12):
+					_log("treescan %.2f ms  %s" % [r[0], r[1]])
+				_log("treescan done: %d parts" % res.size())
+			"animscan":  # animscan <frames>: per-frame process time with all AnimationPlayers/AnimationTrees paused vs running,
+				# and the number of playing players, to see what engine-side animation costs
+				var mixers := []
+				for nd in get_tree().root.find_children("*", "AnimationMixer", true, false):
+					if nd.active:
+						mixers.append(nd)
+				var playing := 0
+				for m in mixers:
+					if m is AnimationPlayer and m.is_playing():
+						playing += 1
+				var am := func() -> float:
+					var tot := 0.0
+					for i in int(p[1]):
+						await get_tree().process_frame
+						tot += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+					return tot / int(p[1])
+				await am.call()
+				var on1: float = await am.call()
+				for m in mixers:
+					m.active = false
+				var off: float = await am.call()
+				for m in mixers:
+					m.active = true
+				var on2: float = await am.call()
+				_log("animscan: %d active mixers (%d players playing): process %.2f ms running, %.2f ms paused" % [
+						mixers.size(), playing, (on1 + on2) / 2.0, off])
+			"perfmon":  # perfmon <seconds> <label>: average CPU time per frame spent in scripts (_process), physics and
+				# rendering setup, from Godot's own monitors; separates script cost from GPU-bound waiting
+				var pm_end := Time.get_ticks_msec() + int(float(p[1]) * 1000.0)
+				var vp_rid := get_viewport().get_viewport_rid()
+				RenderingServer.viewport_set_measure_render_time(vp_rid, true)
+				var sums := [0.0, 0.0, 0.0, 0.0]
+				var n := 0
+				while Time.get_ticks_msec() < pm_end:
+					await get_tree().process_frame
+					sums[0] += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+					sums[1] += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+					sums[2] += RenderingServer.viewport_get_measured_render_time_cpu(vp_rid) + RenderingServer.get_frame_setup_time_cpu()
+					sums[3] += Performance.get_monitor(Performance.TIME_NAVIGATION_PROCESS) * 1000.0
+					n += 1
+				_log("perfmon %s: process %.2f ms, physics %.2f ms, render cpu %.2f ms, navigation %.2f ms (%d frames)" % [
+						p[2] if p.size() > 2 else "", sums[0] / n, sums[1] / n, sums[2] / n, sums[3] / n, n])
 			"skintest":  # skintest <exact mesh name, + for spaces> <refresh|noskin|noskel|info>: skinning experiments
 				for mi in get_tree().current_scene.find_children("*", "MeshInstance3D", true, false):
 					if String(mi.name) != p[1].replace("+", " "):
