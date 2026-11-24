@@ -46,7 +46,34 @@ public class LauncherActivity extends KitActivity {
         Converter.deleteTree(new File(root, "import"));
         new File(root, "converter.pck").delete();
         statusFile = new File(root, "convert_status.json");
+        /* Started from the home-screen shortcut: go straight into the game. */
+        if (ACTION_PLAY.equals(getIntent().getAction()) && gameReady() && !converting()) {
+            super.onCreate(b);
+            startActivity(new Intent().setClassName(this, GAME_ACTIVITY));
+            finish();
+            return;
+        }
         super.onCreate(b);
+    }
+
+    static final String ACTION_PLAY = "com.buckdroid.roulette.PLAY";
+
+    /* A home-screen shortcut that starts the game. Its icon is the game's own, taken from the player's .exe during setup
+     * (Converter.extractIcon, game_icon.png in the app's folder); without it the app's icon. */
+    void addShortcut() {
+        android.content.pm.ShortcutManager sm = getSystemService(android.content.pm.ShortcutManager.class);
+        if (sm == null || !sm.isRequestPinShortcutSupported()) { toast("This home screen does not support shortcuts."); return; }
+        File iconFile = new File(root, Converter.ICON_FILE);
+        android.graphics.Bitmap bmp = iconFile.exists() ? android.graphics.BitmapFactory.decodeFile(iconFile.getPath()) : null;
+        android.graphics.drawable.Icon icon = bmp != null ? android.graphics.drawable.Icon.createWithBitmap(bmp)
+                : android.graphics.drawable.Icon.createWithResource(this, getApplicationInfo().icon);
+        android.content.pm.ShortcutInfo info = new android.content.pm.ShortcutInfo.Builder(this, "play")
+                .setShortLabel("Buckshot Roulette")
+                .setIcon(icon)
+                .setIntent(new Intent(this, LauncherActivity.class).setAction(ACTION_PLAY)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                .build();
+        sm.requestPinShortcut(info, null);
     }
 
     @Override protected String title() { return "Buckdroid Roulette"; }
@@ -146,6 +173,14 @@ public class LauncherActivity extends KitActivity {
         play.setEnabled(ready);
         play.setOnClickListener(v -> startActivity(new Intent().setClassName(this, GAME_ACTIVITY)));
         card.addView(play, fullWidth(56));
+        if (ready) {
+            card.addView(space(6));
+            Button sc = button("Add to home screen", CARD2);
+            sc.setOnClickListener(v -> addShortcut());
+            card.addView(sc, fullWidth(44));
+            if (!new File(root, Converter.ICON_FILE).exists())
+                card.addView(text("Set up again from your game file once to give the shortcut the game's own icon.", 11, DIM, false));
+        }
         content.addView(card);
 
         if (s != null && "error".equals(s.optString("state"))) {

@@ -2,6 +2,7 @@
 Original code, part of Buckdroid Roulette (GPL-3.0-or-later).
 
 Takes our engine template APK (engine/build_android46.bat: Godot 4.6.3 + patches + the launcher), adds:
+  res/mipmap*/icon*.webp our app icon (launcher/icon) in place of Godot's
   assets/_cl_            the engine command line: --main-pack <app folder>/game.pck (the game converted on the phone)
   assets/payload/        what the launcher's converter (Converter.java) injects into the game: the Buckdroid scripts
                          (src/), versions.json and autoloads.json (patches/). This project's own code only
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import io
 import os
 import struct
 import subprocess
@@ -37,6 +39,25 @@ def cl_blob(args: list[str]) -> bytes:
     return out
 
 
+def icons(src: zipfile.ZipFile) -> dict[str, bytes]:
+    """Our app icon (launcher/icon, drawn by tools/make_icon.py) in place of Godot's, at each density the template has."""
+    from PIL import Image
+    pics = {"icon": "legacy.png", "icon_foreground": "foreground.png", "icon_monochrome": "monochrome.png",
+            "icon_background": "foreground.png"}
+    out = {}
+    for n in src.namelist():
+        base = os.path.basename(n)[:-5] if n.startswith("res/mipmap") and n.endswith(".webp") else None
+        if base not in pics:
+            continue
+        with Image.open(io.BytesIO(src.read(n))) as old:
+            size, mode = old.size, old.mode
+        with Image.open(os.path.join(ROOT, "launcher", "icon", pics[base])) as im:
+            buf = io.BytesIO()
+            im.convert(mode).resize(size, Image.LANCZOS).save(buf, "WEBP", lossless=True)
+        out[n] = buf.getvalue()
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -55,10 +76,12 @@ def main() -> None:
                 n = i.filename
                 if n.startswith("META-INF/") and n.endswith((".SF", ".RSA", ".MF", ".EC", ".DSA")):
                     continue
-                if n in ("assets/_cl_", "assets/converter.pck") or n.startswith("assets/payload/") or n in files:
+                if n in ("assets/_cl_", "assets/converter.pck") or n.startswith("assets/payload/") or n in files                         or (n.startswith("res/mipmap") and n.endswith(".webp")):
                     continue
                 dst.writestr(i, src.read(n))
             dst.writestr(zipfile.ZipInfo("assets/_cl_"), cl_blob(args))
+            for n, d in icons(src).items():
+                dst.writestr(zipfile.ZipInfo(n), d)
             for n, d in sorted(files.items()):
                 dst.writestr(zipfile.ZipInfo(n), d, compress_type=zipfile.ZIP_DEFLATED)
             if "lib/arm64-v8a/libbdconvert.so" not in src.namelist():

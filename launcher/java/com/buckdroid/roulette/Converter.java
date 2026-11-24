@@ -14,6 +14,8 @@ package com.buckdroid.roulette;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 
@@ -103,6 +105,8 @@ final class Converter implements Runnable {
                 set("Checking the game file", "Verifying " + ver.getString("name"), 0.01f);
                 if (!sha256(len).equals(ver.getString("exe_sha256")))
                     throw new Fail("The game file does not match the original " + ver.getString("name") + ". Copy it again.");
+                /* The game's own icon, from the player's .exe, for the home-screen shortcut. Stays on the phone. */
+                try { extractIcon(new File(out.getParentFile(), ICON_FILE)); } catch (Throwable ignored) { }
             }
 
             set("Patching", ver.getString("name"), 0.08f);
@@ -188,6 +192,77 @@ final class Converter implements Runnable {
     }
 
     static final class Fail extends Exception { Fail(String m) { super(m); } }
+
+    /* ------------------------------------------------------------ the game's icon (Windows .exe resources) */
+    static final String ICON_FILE = "game_icon.png";
+
+    /* Finds the largest icon (RT_ICON) in the .exe's resources and saves it as a PNG. Icons are stored as PNG or as a
+     * 32-bit bitmap (BITMAPINFOHEADER, height doubled for the mask, rows bottom-up, BGRA). */
+    private void extractIcon(File dst) throws Exception {
+        int pe = readAt(0x3C, 4).getInt();
+        ByteBuffer h = readAt(pe, 24);
+        if (h.getInt(0) != 0x00004550) return;
+        int nsec = h.getShort(6) & 0xFFFF, optSize = h.getShort(20) & 0xFFFF;
+        ByteBuffer opt = readAt(pe + 24, optSize);
+        int dirs = (opt.getShort(0) & 0xFFFF) == 0x20B ? 112 : 96;
+        int resRva = opt.getInt(dirs + 16), resSize = opt.getInt(dirs + 20);
+        if (resRva == 0 || resSize <= 0 || resSize > (64 << 20)) return;
+        ByteBuffer sec = readAt(pe + 24 + optSize, nsec * 40);
+        long resOff = -1;
+        int secVa = 0, secRaw = 0;
+        for (int i = 0; i < nsec; i++) {
+            int va = sec.getInt(i * 40 + 12), vsz = Math.max(sec.getInt(i * 40 + 8), sec.getInt(i * 40 + 16));
+            if (resRva >= va && resRva < va + vsz) { secVa = va; secRaw = sec.getInt(i * 40 + 20); resOff = secRaw + (long) (resRva - va); }
+        }
+        if (resOff < 0) return;
+        ByteBuffer r = readAt(resOff, resSize);
+        Bitmap best = null;
+        for (int[] t : dirEntries(r, 0)) {
+            if (t[0] != 3 || t[1] >= 0) continue;                      /* RT_ICON, a subdirectory */
+            for (int[] id : dirEntries(r, t[1] & 0x7FFFFFFF)) {
+                if (id[1] >= 0) continue;
+                for (int[] lang : dirEntries(r, id[1] & 0x7FFFFFFF)) {
+                    if (lang[1] < 0) continue;
+                    int rva = r.getInt(lang[1]), size = r.getInt(lang[1] + 4);
+                    long off = secRaw + (long) (rva - secVa);
+                    if (size <= 0 || size > (16 << 20)) continue;
+                    Bitmap b = decodeIcon(readAt(off, size).array());
+                    if (b != null && (best == null || b.getWidth() > best.getWidth())) best = b;
+                }
+            }
+        }
+        if (best == null || best.getWidth() < 48) return;
+        File tmp = new File(dst.getPath() + ".part");
+        try (FileOutputStream o = new FileOutputStream(tmp)) { best.compress(Bitmap.CompressFormat.PNG, 100, o); }
+        if (!tmp.renameTo(dst)) tmp.delete();
+    }
+
+    /* A resource directory's entries: {id (or -1 for a named entry), offset (negative: a subdirectory)}. */
+    private static List<int[]> dirEntries(ByteBuffer r, int at) {
+        int n = (r.getShort(at + 12) & 0xFFFF) + (r.getShort(at + 14) & 0xFFFF);
+        List<int[]> l = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            int name = r.getInt(at + 16 + i * 8), off = r.getInt(at + 16 + i * 8 + 4);
+            l.add(new int[]{name < 0 ? -1 : name, off});
+        }
+        return l;
+    }
+
+    private static Bitmap decodeIcon(byte[] d) {
+        if (d.length > 8 && (d[0] & 0xFF) == 0x89 && d[1] == 'P' && d[2] == 'N' && d[3] == 'G')
+            return BitmapFactory.decodeByteArray(d, 0, d.length);
+        ByteBuffer b = ByteBuffer.wrap(d).order(ByteOrder.LITTLE_ENDIAN);
+        if (d.length < 40 || b.getInt(0) != 40) return null;
+        int w = b.getInt(4), hgt = b.getInt(8) / 2, bits = b.getShort(14);
+        if (bits != 32 || w <= 0 || w > 1024 || hgt != w || 40 + (long) w * hgt * 4 > d.length) return null;
+        int[] px = new int[w * hgt];
+        for (int y = 0; y < hgt; y++)
+            for (int x = 0; x < w; x++) {
+                int o = 40 + ((hgt - 1 - y) * w + x) * 4;
+                px[y * w + x] = (d[o + 3] & 0xFF) << 24 | (d[o + 2] & 0xFF) << 16 | (d[o + 1] & 0xFF) << 8 | (d[o] & 0xFF);
+            }
+        return Bitmap.createBitmap(px, w, hgt, Bitmap.Config.ARGB_8888);
+    }
 
     private void set(String p, String d, float f) {
         phase = p;
