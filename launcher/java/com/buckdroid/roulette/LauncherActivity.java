@@ -217,6 +217,34 @@ public class LauncherActivity extends KitActivity {
         imp.addView(text("Needs about 1.2 GB free while setting up, 0.75 GB afterwards. The picked file is only read; "
                 + "you can delete it afterwards.", 11, DIM, false));
         content.addView(imp);
+
+        /* Multiplayer: the name other players see, chat, and what is shared with them. */
+        Ini mp = new Ini(new File(config, "multiplayer.ini"));
+        LinearLayout m = card();
+        m.addView(header("Multiplayer"));
+        m.addView(text("Your name", 15, TEXT, false));
+        android.widget.EditText name = new android.widget.EditText(this);
+        name.setSingleLine(true);
+        name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(24)});
+        name.setText(mp.get("nickname", ""));
+        name.setHint("Player");
+        name.setTextColor(TEXT);
+        name.setHintTextColor(DIM);
+        name.setBackground(round(CARD2, 10));
+        name.setPadding(dp(12), dp(10), dp(12), dp(10));
+        name.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(android.text.Editable s) {
+                mp.set("nickname", s.toString().replace("=", "").replace(";", "").trim());
+            }
+        });
+        m.addView(name, fullWidth(48));
+        m.addView(toggle(mp, "chat", "In-game chat", "on", "off", "on", "Messages with the other players at the table."));
+        m.addView(text("Games are played directly between the phones (the host's phone connects everyone). As in any "
+                + "peer-to-peer game, the players at a table can see each other's internet address; nothing else about "
+                + "you is shared, and the game and chat never pass through a server.", 11, DIM, false));
+        content.addView(m);
     }
 
     @Override protected void onActivityResult(int req, int res, Intent data) {

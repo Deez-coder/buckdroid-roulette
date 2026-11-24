@@ -10,6 +10,7 @@
 ##   graphics.ini   shadow_mode = mixed | cube | paraboloid     fps_cap = 60 | 30 | 0 (unlimited)
 ##   controls.ini   touch_mode = direct | relative   cursor_speed = 1.00 (0.25 - 4)   cursor_size = 1.00 (0.5 - 3)
 ##   graphics.ini   fps_counter = off | on (performance overlay)
+##   multiplayer.ini   nickname = <text, up to 24 characters; case kept>   chat = on | off
 ##
 ## Read once at start; touch settings are read again when controls.ini changes (checked about once a second), so
 ## the launcher's in-game menu can change them live later.
@@ -20,6 +21,7 @@ signal controls_changed
 const DEFAULTS := {
 	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": "", "thermal_guard": ""},   # "" = let BuckdroidRender pick the platform default
 	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00", "tap_assist": "off"},
+	"multiplayer": {"nickname": "", "chat": "on"},   # nickname "" = "Player" and 4 digits of the player ID
 }
 
 var config_dir := "user://config"
@@ -116,6 +118,12 @@ transparency_fallback = auto
 ; Diagnostics for testers: write performance and temperature logs to the telemetry folder (on or off).
 telemetry = off
 """,
+	"multiplayer": """; Buckdroid Roulette - multiplayer settings. A missing key means the default.
+; The name other players see (up to 24 characters). Empty: "Player" and four digits.
+nickname =
+; In-game chat in multiplayer: on or off.
+chat = on
+""",
 	"controls": """; Buckdroid Roulette - touch settings. A missing key means the default.
 ; direct = tap where you want to click; relative = drag to move a cursor like a trackpad, tap to click;
 ; pad = on-screen buttons (D-pad, A, B, menu) over the game, tapping the game is off.
@@ -155,5 +163,6 @@ func _load(file: String) -> void:
 		var eq := line.find("=")
 		if eq <= 0:
 			continue
-		out[line.substr(0, eq).strip_edges().to_lower()] = line.substr(eq + 1).strip_edges().to_lower()
+		var value := line.substr(eq + 1).strip_edges()
+		out[line.substr(0, eq).strip_edges().to_lower()] = value if file == "multiplayer" else value.to_lower()   # names keep their case
 	_values[file] = out
