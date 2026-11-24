@@ -69,8 +69,20 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   Per-peer rate limits (packets per second, bytes per second); a peer over the limit is dropped.
 - **Identity:** each install gets a random 64-bit player ID (stored in the app folder) and the player's chosen nickname
   (launcher setting). No accounts, no phone numbers, no Steam data.
-- **Privacy note (in the app):** as in any peer-to-peer game, the players in a lobby can see each other's IP address,
-  and the public signalling points see that a device asked for some room. No game content or chat goes through them.
+- **Keeping IP addresses hidden as far as a direct connection allows** (user request):
+  - *Clients never see each other's address:* each client connects only to the host, and the host forwards. Only the
+    host learns the clients' public addresses, and the clients learn only the host's.
+  - *No private network addresses leak:* in room-code play our layer removes local (host) candidates from the offer and
+    answer, so a phone's home-network or carrier-internal address is never sent; only the public address that the
+    STUN server reports. Local candidates are kept only in local Wi-Fi play, where everyone is on the same network anyway.
+  - *Nothing on screen:* the game and our layer never show, log or put an address in the telemetry or chat; player IDs are
+    random numbers unrelated to the address.
+  - *Signalling points* see the address their WebSocket comes from (as any website does), but not the offer contents,
+    which are encrypted.
+  - *Full hiding needs a relay:* the host's public address can only be hidden from clients if traffic goes through a
+    relay. The advanced TURN setting has a "Relay only" switch (ICE policy `relay`) that sends everything through the
+    player's own relay, so no peer learns the player's address at all.
+  - The app explains this in one line next to the multiplayer settings.
 - Stays within the hard rules: our code only, no game assets, nothing about DRM.
 
 ### Consistency
