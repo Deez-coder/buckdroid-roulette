@@ -19,6 +19,6 @@ goto :eof
 :android
 set "ANDROID_HOME=%ROOT%\.cache\android\sdk"
 set "ANDROID_NDK_ROOT=%ROOT%\.cache\android\sdk\ndk\29.0.14206865"
-python -m SCons platform=android target=template_debug arch=arm64 android_api_level=24 -j12 || exit /b 1
+python -m SCons platform=android target=template_debug arch=arm64 android_api_level=24 ndk_version=29.0.14206865 -j12 || exit /b 1
 if not exist "%ROOT%\launcher\jniLibs\arm64-v8a" mkdir "%ROOT%\launcher\jniLibs\arm64-v8a"
 for /r bin\android %%F in (libwebrtc_native*.so) do copy /y "%%F" "%ROOT%\launcher\jniLibs\arm64-v8a\" >nul
