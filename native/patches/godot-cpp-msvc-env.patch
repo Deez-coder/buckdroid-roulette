@@ -1,0 +1,30 @@
+diff --git a/tools/windows.py b/tools/windows.py
+index 9aad0d8..c61c418 100644
+--- a/tools/windows.py
++++ b/tools/windows.py
+@@ -88,7 +88,7 @@ def exists(env):
+ 
+ 
+ def generate(env):
+-    if not env["use_mingw"] and msvc.exists(env):
++    if not env["use_mingw"] and ("VCINSTALLDIR" in os.environ or msvc.exists(env)):
+         if env["arch"] == "x86_64":
+             env["TARGET_ARCH"] = "amd64"
+         elif env["arch"] == "arm64":
+@@ -105,7 +105,15 @@ def generate(env):
+         env["is_msvc"] = True
+ 
+         # MSVC, linker, and archiver.
+-        msvc.generate(env)
++        if "VCINSTALLDIR" in os.environ:
++            # Buckdroid: inside a Developer Command Prompt (vcvars64.bat) use its environment; SCons may not know the
++            # installed Visual Studio version (VS 2026 / MSVC 14.5x).
++            env["MSVC_USE_SCRIPT"] = False
++            env["MSVC_VERSION"] = env["MSVS_VERSION"] = "14.3"  # any version SCons knows; only used for flags
++            for k in ("PATH", "INCLUDE", "LIB", "LIBPATH"):
++                env["ENV"][k] = os.environ.get(k, "")
++        else:
++            msvc.generate(env)
+         env.Tool("msvc")
+         env.Tool("mslib")
+         env.Tool("mslink")

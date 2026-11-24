@@ -74,6 +74,22 @@ def add_etc2_remap(import_file: bytes, etc2_path: str | None) -> bytes | None:
     return None
 
 
+# The WebRTC GDExtension (native/build_webrtc.bat). The libraries are not in the pack: Godot loads them by file name from
+# the APK's native library folder (Android) or next to the executable (Windows).
+WEBRTC_GDEXTENSION = """[configuration]
+
+entry_symbol = "webrtc_extension_init"
+compatibility_minimum = 4.3
+
+[libraries]
+
+windows.debug.x86_64 = "libwebrtc_native.windows.template_debug.x86_64.dll"
+android.debug.arm64 = "libwebrtc_native.android.template_debug.arm64.so"
+windows.release.x86_64 = "libwebrtc_native.windows.template_release.x86_64.dll"
+android.release.arm64 = "libwebrtc_native.android.template_release.arm64.so"
+"""
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("source")
@@ -81,6 +97,8 @@ def main():
     ap.add_argument("--android", action="store_true", help="apply the Android settings overrides")
     ap.add_argument("--full-hash", action="store_true", help="also check the SHA-256 of the whole PCK")
     ap.add_argument("--dev", action="store_true", help="add the dev-only test driver (src_dev/); never for users")
+    ap.add_argument("--dev-net", action="store_true",
+                    help="dev only: add the WebRTC GDExtension and the network spike (src_dev/net_test.gd)")
     ap.add_argument("--dev-set", action="append", default=[], metavar="KEY=VALUE",
                     help="dev experiments only: set a project setting (int, float, true/false or text)")
     ap.add_argument("--dev-renderer", choices=["forward_plus", "mobile", "gl_compatibility"],
@@ -123,6 +141,12 @@ def main():
         with open(os.path.join(ROOT, "src_dev", "test_driver.gd"), "rb") as f:
             ours[RES_PREFIX + "dev/test_driver.gd"] = f.read()
         autoloads.append(("BuckdroidTestDriver", "dev/test_driver.gd"))
+    if a.dev_net:
+        with open(os.path.join(ROOT, "src_dev", "net_test.gd"), "rb") as f:
+            ours[RES_PREFIX + "dev/net_test.gd"] = f.read()
+        autoloads.append(("BuckdroidNetTest", "dev/net_test.gd"))
+        ours[RES_PREFIX + "net/webrtc.gdextension"] = WEBRTC_GDEXTENSION.encode("utf-8")
+        ours["res://.godot/extension_list.cfg"] = (RES_PREFIX + "net/webrtc.gdextension\n").encode("utf-8")
 
     # 4. project settings
     pb = ProjectBinary(pck.read("res://project.binary"))
