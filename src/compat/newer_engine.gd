@@ -13,12 +13,17 @@ extends Node
 
 var _rebuilt := {}   # original shadow mesh instance id -> rebuilt ArrayMesh
 var _fixed_skeletons := 0
+var _fix_skeletons := true
+var _fix_shadow_meshes := true
 
 
 func _enter_tree() -> void:
 	if Engine.get_version_info().hex < 0x040200:
 		set_process(false)
 		return
+	# Dev switches to test the fixes one at a time.
+	_fix_skeletons = not OS.get_cmdline_user_args().has("--bd-compat-no-skeleton")
+	_fix_shadow_meshes = not OS.get_cmdline_user_args().has("--bd-compat-no-shadowmesh")
 	get_tree().node_added.connect(_on_node_added)
 
 
@@ -30,11 +35,11 @@ func _on_node_added(node: Node) -> void:
 func _fix_mesh_instance(mi: MeshInstance3D) -> void:
 	if not is_instance_valid(mi):
 		return
-	if mi.skeleton.is_empty() and mi.get_parent() is Skeleton3D:
+	if _fix_skeletons and mi.skeleton.is_empty() and mi.get_parent() is Skeleton3D:
 		mi.skeleton = NodePath("..")
 		_fixed_skeletons += 1
 	var mesh := mi.mesh as ArrayMesh
-	if mesh and mesh.shadow_mesh:
+	if _fix_shadow_meshes and mesh and mesh.shadow_mesh:
 		mesh.shadow_mesh = _rebuild(mesh.shadow_mesh)
 
 
