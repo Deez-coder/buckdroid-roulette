@@ -22,6 +22,60 @@ func _process(_delta: float) -> void:
 		_scene = scene
 		if scene:
 			_on_scene_changed.call_deferred(scene)
+	_update_lobby_code(scene)
+
+
+# --- the lobby ID as text on the lobby screen (user request: readable without pasting it somewhere) --------------------
+const LOBBY_SCENE := "res://multiplayer/scenes/mp_lobby.tscn"
+var _code_layer: CanvasLayer
+var _code_label: Label
+var _code_shown := -1
+
+
+func _update_lobby_code(scene: Node) -> void:
+	var gs := get_node_or_null(^"/root/GlobalSteam")
+	var id: int = gs.LOBBY_ID if gs and scene and scene.scene_file_path == LOBBY_SCENE else 0
+	if id == _code_shown:
+		return
+	_code_shown = id
+	if id == 0:
+		if _code_layer:
+			_code_layer.visible = false
+		return
+	if _code_layer == null or not is_instance_valid(_code_layer):
+		_code_layer = CanvasLayer.new()
+		_code_layer.layer = 50
+		add_child(_code_layer)
+		_code_label = Label.new()
+		_code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_code_label.anchor_left = 1.0
+		_code_label.anchor_right = 1.0
+		_code_label.offset_left = -430
+		_code_label.offset_right = -30
+		_code_label.offset_top = 78
+		_code_label.offset_bottom = 138
+		_code_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_code_layer.add_child(_code_label)
+	# The lobby screen's own look: its font and green, found on one of its labels.
+	# (its text is in buttons and labels with their own font: take the first one that does not use the default font)
+	for n in scene.find_children("*", "Control", true, false):
+		if not (n is Label or n is Button or n is RichTextLabel):
+			continue
+		var font_name := &"normal_font" if n is RichTextLabel else &"font"
+		var color_name := &"default_color" if n is RichTextLabel else &"font_color"
+		var f: Font = n.get_theme_font(font_name)
+		if f == null or f == ThemeDB.fallback_font:
+			continue
+		_code_label.add_theme_font_override(&"font", f)
+		_code_label.add_theme_color_override(&"font_color", n.get_theme_color(color_name))
+		break
+	_code_label.add_theme_font_size_override(&"font_size", 22)
+	var digits := str(id)
+	var groups := PackedStringArray()
+	for i in range(0, digits.length(), 4):
+		groups.append(digits.substr(i, 4))
+	_code_label.text = "LOBBY ID\n" + " ".join(groups)
+	_code_layer.visible = true
 
 
 func _on_scene_changed(scene: Node) -> void:

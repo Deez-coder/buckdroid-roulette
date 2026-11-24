@@ -143,3 +143,16 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   and reached the first round. Phone (host, converted on the phone) and PC (joiner): lobby, match start, item grabbing
   and turns in sync, confirmed by the user.
 - Next: room codes over the internet (step 4), nickname and chat settings, reconnects, chat.
+
+## Step 4: room codes over the internet (2026-11-24)
+- `src/net/room_signal.gd`: encrypted signalling through three public MQTT brokers over wss (EMQX, HiveMQ, Mosquitto
+  public brokers), as designed above. Reconnects by itself (the game pauses while the player is in another app, e.g.
+  sharing the code), alternates between the normal address and IPv4 (networks that resolve to unreachable IPv6), and
+  notices dead connections through missed pings.
+- `session.gd` tries the local network and the room at once; local addresses are stripped from everything sent through
+  the room; STUN (Google, Cloudflare) for the direct path. Lobby IDs are 16 random digits (the room code). A joiner keeps
+  trying for 30 s; if the host answered but no direct path got through, it gets a clear message.
+- Tests: two PC copies with local discovery off; then the phone on mobile data (carrier NAT, IPv6 with 464XLAT) hosting
+  and the PC on home Wi-Fi joining: direct connection, lobby joined.
+- The lobby screen shows the lobby ID as text, in groups of four, in the lobby's own font (BuckdroidBoot; user request).
+- `tools/refresh_payload.py` swaps our scripts into an already converted pack (developer testing on the own phone).

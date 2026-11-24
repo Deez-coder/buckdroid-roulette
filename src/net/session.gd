@@ -41,6 +41,7 @@ const MSG_GAME := 2
 const MSG_CHAT := 3
 const STUN := ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"]
 const OFFER_RETRY := 4.0
+const ROOM_JOIN_TIMEOUT := 30.0   # the host may be in another app for a moment (sharing the code); Android pauses it
 const RoomSignal := preload("res://buckdroid/net/room_signal.gd")
 
 # Steam enum values (the same as steam_stub.gd)
@@ -328,7 +329,7 @@ func _process(delta: float) -> void:
 		var f: Dictionary = _found.get(_joining, {})
 		if not f.is_empty():
 			_connect_to_host(f.ip, f.port)       # on the same network: the direct local path wins
-		elif _now() - _join_started > JOIN_TIMEOUT * 2:
+		elif _now() - _join_started > ROOM_JOIN_TIMEOUT:
 			if _join_peer:
 				_close_peer(_join_peer, false)
 				_peers.erase(0)

@@ -53,7 +53,8 @@ func _init(code: String) -> void:
 
 func start(brokers: Array = BROKERS) -> void:
 	for url in brokers:
-		var c := {"state": 0, "buf": PackedByteArray(), "last_ping": 0.0, "url": url, "v4": false}
+		var c := {"state": 0, "buf": PackedByteArray(), "last_ping": 0.0, "url": url, "v4": false, "fails": 0,
+				"retry_at": 0.0, "last_rx": Time.get_ticks_msec() / 1000.0}
 		c.ws = _open_ws(url, "")
 		c.started = Time.get_ticks_msec() / 1000.0
 		_conns.append(c)
@@ -102,34 +103,49 @@ func send(to: String, msg: Dictionary) -> void:
 func poll() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	for c in _conns:
+		if c.state == -1:
+			# Waiting to reconnect (the game was in the background, the network changed, the broker dropped us...).
+			if now >= c.retry_at:
+				var ip := ""
+				if c.v4:
+					ip = IP.resolve_hostname(c.url.get_slice("//", 1).get_slice("/", 0).get_slice(":", 0), IP.TYPE_IPV4)
+				c.ws = _open_ws(c.url, ip)
+				c.state = 0
+				c.started = now
+				c.last_rx = now
+				c.buf = PackedByteArray()
+			continue
 		var ws: WebSocketPeer = c.ws
 		ws.poll()
 		var st := ws.get_ready_state()
+		var failed := false
 		if st == WebSocketPeer.STATE_OPEN:
 			if c.state == 0:
 				ws.put_packet(_connect_packet())
 				c.state = 1
 				c.last_ping = now
+				c.last_rx = now
 			while ws.get_available_packet_count() > 0:
 				c.buf.append_array(ws.get_packet())
+				c.last_rx = now
 				if c.buf.size() > 512 * 1024:
 					c.buf = PackedByteArray()
 			_parse(c)
 			if c.state == 2 and now - c.last_ping > KEEPALIVE * 0.5:
 				c.last_ping = now
 				ws.put_packet(PackedByteArray([0xC0, 0x00]))   # PINGREQ
-		elif st == WebSocketPeer.STATE_CLOSED or (st == WebSocketPeer.STATE_CONNECTING and now - c.started > 4.0):
-			if not c.v4:
-				# Try again over IPv4 once.
-				c.v4 = true
-				var host: String = c.url.get_slice("//", 1).get_slice("/", 0).get_slice(":", 0)
-				var ip := IP.resolve_hostname(host, IP.TYPE_IPV4)
-				if ip != "":
-					ws.close()
-					c.ws = _open_ws(c.url, ip)
-					c.started = now
-					continue
+			# no answer to pings, or the broker never accepted us: the connection is dead even if the socket looks open
+			failed = now - c.last_rx > KEEPALIVE * 1.5 or (c.state == 1 and now - c.started > 10.0)
+		elif st == WebSocketPeer.STATE_CLOSED or (st == WebSocketPeer.STATE_CONNECTING and now - c.started > 5.0):
+			failed = true
+		if failed:
+			ws.close()
+			c.fails += 1
+			# Alternate between the normal address and IPv4 (some networks resolve to IPv6 they cannot reach), and
+			# wait a little longer after each failure (2 s up to 20 s).
+			c.v4 = not c.v4
 			c.state = -1
+			c.retry_at = now + minf(20.0, 2.0 * pow(2.0, mini(c.fails - 1, 4)))
 	var old := []
 	for n in _seen:
 		if now - _seen[n] > MAX_AGE * 2:
@@ -187,6 +203,7 @@ func _parse(c: Dictionary) -> void:
 					c.ws.put_packet(_subscribe_packet())
 			9:   # SUBACK
 				c.state = 2
+				c.fails = 0
 			3:   # PUBLISH
 				if body.size() < 2:
 					continue
