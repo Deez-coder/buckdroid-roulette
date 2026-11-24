@@ -171,3 +171,20 @@ Rules learned the hard way:
 New autoload `src/compat/newer_engine.gd` (BuckdroidCompat, inactive on 4.1): sets empty skeleton paths under a Skeleton3D back to "..", rebuilds shadow meshes from their arrays. First test run of it was in progress at the stop; check `.work/cf46_cmp.png` (4.1 vs 4.6+compat at corridor/table/dealer). Remaining plan: confirm fixes (else rebuild whole meshes, measured 369 ms for 582 meshes on PC), port engine patches 0002/0006 (shadow budgets), 0003/0004 (60 Hz, Java side changed in 4.6), re-test the flicker (0005), switch versions/build tools to the 4.6 target, phone GPU measurement and a full user playthrough. 4.6 build: `engine/build_android46.bat` (source `engine/godot46`, NDK 29); 4.6 launcher activity is GodotAppLauncher. The phone still runs the working 4.1 build.
 
 Note: the first BuckdroidCompat test run stopped after the menu screenshot (no script errors logged, only q0_menu.png). Next session: check whether the compat autoload stalls the intro on 4.6 (log in .work/cf46.log), then fix and rerun.
+
+## Moved to Godot 4.6.3 (2026-11-24, user decision; Claude's choices while the user was away are marked *choice*)
+
+**State:** the phone runs our own Godot 4.6.3 build (`engine/godot46`, `engine/build_android46.bat`, patches in `engine/patches46/`) with 4.6-target data (`build_patched_pck.py` now defaults to `--target-engine 4.6`; `--target-engine 4.1` keeps the old path with `engine/godot` and `engine/patches/`). Scripted check on the phone: intro, bathroom, waiver, first round (grab gun, DEALER/YOU choice, shot, shell ejects, dealer's turn) all work; no script errors.
+
+**4.6 compatibility (`src/compat/newer_engine.gd`, autoload BuckdroidCompat, does nothing on 4.1):**
+1. Skeleton path default: 4.1 defaulted `MeshInstance3D.skeleton` to "..", 4.6 to empty; skinned meshes under a Skeleton3D get ".." back. Fixes the invisible corridor smoker and the dealer's head pose (verified against 4.1 screenshots).
+2. Broken shadow meshes from 4.6's on-load upgrade of 4.1 mesh data (dark box over the player's briefcase hatch): each mesh with a shadow mesh is replaced by a fresh copy built from its own arrays (*choice*: at runtime, ~218 ms for 535 meshes on the PC, once per scene; could move into the conversion step later). Changing `shadow_mesh` in place crashes 4.6 (segfault), so the whole mesh is replaced.
+3. Data adaptations in the PCK builder: global class list fields (`is_abstract`, `is_tool`), four Node-typed `@export`s in the multiplayer-only `MP_ItemResource_User.gd` relaxed.
+
+**Engine patches on 4.6:** 46-0001 shadow-update budget (paraboloid + cube intervals, same settings as before); 46-0002 60 Hz request (VkSurfaceView); 46-0003 touch-boost opt-out moved into GodotActivity (the 4.6 view only has the application context). *choice*: the flicker fix (4.1 patch 0005) is NOT ported: 4.6 showed 0 vanishes in 2 scripted 20-flip runs (4.1 had 4-28 per run). Patch 0001 (diagnostic) not ported.
+
+**Measured on the phone, same session (GPU load = clock x busy at the table):** 4.1 + budgets 480; 4.6 without budgets 495; **4.6 + budgets 458 (-5% GPU vs 4.1)**; CPU main loop ~18 → ~15 ms (-18%); worst frame 19-20 → 17 ms. The budgets and 4.6's own light culling overlap, so the GPU gain is smaller than the first estimate (-15%). Real-play heat on 4.6 not measured yet (needs the user).
+
+**Known:** repeated engine errors "BUG, indexing did not unpair geometries from light" and "geom->softshadow_count==0 - BUG!" (also on the unmodified official 4.6 build; no visible effect yet). Old mesh surfaces are upgraded at every load (warning spam; load time). 4.6 launcher activity is GodotAppLauncher.
+
+**Next:** real-play heat session on 4.6 with the user, user playthrough check (menus, all items, endings, endless mode), then Phase 4 controls.
