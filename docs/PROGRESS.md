@@ -254,3 +254,4 @@ Design (Claude's choices): one APK = our Godot 4.6.3 template + a Java launcher 
 ## Multiplayer (recon 2026-11-24)
 User decision: peer-to-peer online play by room code, local Wi-Fi play and an in-game chat; no Steam cross-play. Recon: the game uses only GodotSteam lobby and P2P packet calls (no Godot high-level multiplayer), host-centred, with its own copy/paste lobby ID, so the network layer can live entirely in our Steam replacement. Plan, security and steps: docs/MULTIPLAYER.md.
 - 2026-11-24, multiplayer spike passed: WebRTC plugin (built from source) loads on 4.6 on PC and phone; phone-PC direct data channel over Wi-Fi works (14 ms median round trip, 12 MB/s). Details in docs/MULTIPLAYER.md.
+- 2026-11-24, multiplayer works on the local network: phone hosts, PC joins, match in sync (user confirmed). BuckdroidNet behind the Steam stub; details in docs/MULTIPLAYER.md.

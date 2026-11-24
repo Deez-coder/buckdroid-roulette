@@ -128,3 +128,18 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
 - The app now has the INTERNET and ACCESS_NETWORK_STATE permissions (engine patch 46-0011); both are normal permissions,
   granted at install without a prompt.
 - Not yet checked: loading inside the full converted game, mobile data / NAT traversal (step 4).
+
+## Steps 2 and 3 done (2026-11-24)
+- `src/net/session.gd` (autoload BuckdroidNet, before Steam) runs the lobby: WebRTC data channel per member to the host,
+  host forwards; local network discovery by UDP broadcast (port 47610), signalling over a short TCP connection to the
+  host (port 47611 when free). Control messages, game packets and chat share one reliable ordered channel with a type
+  byte. Game packets are checked (size, decompressed size, sender is a member, rate limits) before the game sees them.
+- `steam_stub.gd` now answers lobbies and P2P through it; `loggedOn()` is true when the WebRTC extension is loaded, and
+  BuckdroidBoot only greys out Multiplayer when it is not. Every converted pack lists the extension in
+  `res://.godot/extension_list.cfg` (PC builder and the phone's Converter).
+- Disconnects: a member counts as gone when its WebRTC connection fails or closes, or after 60 s of silence (a short
+  timeout dropped players while a match loaded).
+- Tests: two PC copies (test driver steps `callscript`, `savelobby`, `joinsaved`, `net`) hosted, joined, started a match
+  and reached the first round. Phone (host, converted on the phone) and PC (joiner): lobby, match start, item grabbing
+  and turns in sync, confirmed by the user.
+- Next: room codes over the internet (step 4), nickname and chat settings, reconnects, chat.
