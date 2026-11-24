@@ -8,7 +8,8 @@
 ## anything instanced later) and hides it while it is fully transparent. The game's own visibility changes are
 ## respected: an object is only ever shown again by us if we were the ones who hid it.
 ## graphics.ini: transparency_fallback = auto | on | off. "auto" (default) turns it on only on Android with the
-## Mobile or Compatibility renderer; Forward+ handles animated transparency itself, and this fallback can flicker
+## Compatibility renderer. Forward+ handles animated transparency itself, and so does the Mobile renderer in
+## Buckdroid's Godot 4.6 build (engine patch 46-0004 ports the per-instance fade). This fallback can flicker
 ## (an animation may set the transparency after this check in the same frame, so a fading object can show fully
 ## opaque for one frame). "--bd-transparency-fallback" forces it on for testing.
 extends Node
@@ -30,7 +31,7 @@ func _ready() -> void:
 		"off":
 			enabled = false
 		_:
-			enabled = OS.get_name() == "Android" and renderer != "forward_plus"
+			enabled = OS.get_name() == "Android" and renderer == "gl_compatibility"
 	if OS.get_cmdline_user_args().has("--bd-transparency-fallback"):
 		enabled = true
 	print("[buckdroid] transparency fallback: %s (setting %s, renderer %s)" % [enabled, mode if mode else "auto", renderer])

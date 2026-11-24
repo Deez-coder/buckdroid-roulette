@@ -1,7 +1,7 @@
 From 3cc2c2ab62cdfe575aa737f20340a29da6d9cd53 Mon Sep 17 00:00:00 2001
 From: buckdroid <buckdroid@localhost>
 Date: Tue, 24 Nov 2026 11:43:38 +0300
-Subject: [PATCH 3/3] Buckdroid 46-0003: touch-boost opt-out from GodotActivity
+Subject: [PATCH 3/4] Buckdroid 46-0003: touch-boost opt-out from GodotActivity
  (the 4.6 view has only the application context)
 
 ---

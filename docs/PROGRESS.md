@@ -203,3 +203,18 @@ Done:
 - `.work/abtest.sh` (needs the phone): installs the Swappy build, then base / Mobile renderer / separate render thread (`rendering/driver/threads/thread_model=2`) / both / base again, each with a frozen dealer close-up (face-shadow check) and GPU clock x busy plus the game's CPU time (now sampled from /proc/<pid>/stat by `.work/gpusample.sh`).
 
 Next when the phone is back: run `bash .work/abtest.sh` (~25 min, unattended), check thermal guard log lines and telemetry columns, then a full heat session.
+
+**A/B on the phone (2026-11-24, Godot 4.6.3 + Swappy, GPU load = clock x busy at the table, CPU = % of one core):**
+
+| Variant | GPU clock | GPU load | CPU | fps / worst frame |
+|---|---|---|---|---|
+| Forward+ (base) | 578-590 MHz | 454-462 | 67-69% | 60 / 23-33 ms |
+| **Mobile renderer** | **366 MHz** | **273-278 (-40%)** | 68% | 60 / 29-34 ms |
+| Forward+ + separate render thread | 590-602 MHz | 449-461 | 79% | 58-59 / 34-35 ms |
+| Mobile + separate render thread | 366 MHz | 266 | 79-82% | 58-59 / 33-35 ms |
+
+Frozen dealer close-ups: Mobile matches Forward+ (mean difference 1.2; face shadows intact, so the 4.1-era Adreno shadow loss is gone in 4.6). The heat guard reads the headroom (overlay showed "heat 0.7x, status 0"). *choice*: separate render thread rejected (more CPU, fps dips).
+
+**Mobile renderer is now the Android default** (*choice*; `patches/versions.json` rendering_method(.mobile) = mobile; `--dev-renderer forward_plus` builds the old path). Engine patch **46-0004** ports the per-instance fade (GeometryInstance3D.transparency, distance fade) from Forward+ to Mobile (fade value in instance flag bits 24-31, faded instances in the transparent pass, shader alpha starts at the fade). Verified on the phone with the script fallback OFF: DEALER/YOU labels appear only on grabbing the gun, no stray blood/labels; flicker repro 0 vanishes. `transparency_fallback = auto` now only applies to the Compatibility renderer.
+
+**Higher frame rates:** fps_cap 90/120 (with a 90/120 Hz display request) still ran at exactly 60: Godot sets Swappy's swap interval to max(display refresh period at swapchain creation, 1/max_fps), so a cap can only lower the rate. Needs an engine change (swap interval from the requested refresh rate) plus switching the panel rate from settings. At 60 fps on Mobile the GPU sits at its lowest clock (366 MHz, ~75% busy), so 90-120 fps is possible but costs heat.

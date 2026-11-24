@@ -1,0 +1,91 @@
+From dd1cbf108ef5ce5062a4cc8eaea8950a031e33c7 Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 15:28:39 +0300
+Subject: [PATCH 4/4] Buckdroid 46-0004: per-instance fade (transparency,
+ distance fade) in the Mobile renderer, ported from Forward+
+
+---
+ .../forward_mobile/render_forward_mobile.cpp    | 17 +++++++++++++++++
+ .../forward_mobile/render_forward_mobile.h      |  3 +++
+ .../forward_mobile/scene_forward_mobile.glsl    |  3 ++-
+ .../scene_forward_mobile_inc.glsl               |  1 +
+ 4 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+index 90af8a9..bcb1281 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
++++ b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+@@ -2107,6 +2107,20 @@ void RenderForwardMobile::_fill_render_list(RenderListType p_render_list, const
+ 			flags |= INSTANCE_DATA_FLAGS_NON_UNIFORM_SCALE;
+ 		}
+ 
++		// Buckdroid: per-instance fade, ported from Forward+ (the Mobile renderer ignored
++		// GeometryInstance3D.transparency and distance fade, so faded objects stayed fully visible).
++		float fade_alpha = 1.0;
++		if (inst->fade_near || inst->fade_far) {
++			float fade_dist = inst->transform.origin.distance_to(p_render_data->scene_data->cam_transform.origin);
++			if (inst->fade_far && fade_dist > inst->fade_far_begin) {
++				fade_alpha = Math::smoothstep(0.0f, 1.0f, 1.0f - (fade_dist - inst->fade_far_begin) / (inst->fade_far_end - inst->fade_far_begin));
++			} else if (inst->fade_near && fade_dist < inst->fade_near_end) {
++				fade_alpha = Math::smoothstep(0.0f, 1.0f, (fade_dist - inst->fade_near_begin) / (inst->fade_near_end - inst->fade_near_begin));
++			}
++		}
++		fade_alpha *= inst->force_alpha * inst->parent_fade_alpha;
++		flags = (flags & ~INSTANCE_DATA_FLAGS_FADE_MASK) | (uint32_t(CLAMP(fade_alpha, 0.0f, 1.0f) * 255.0) << INSTANCE_DATA_FLAGS_FADE_SHIFT);
++
+ 		bool uses_lightmap = false;
+ 		// bool uses_gi = false;
+ 
+@@ -2202,6 +2216,9 @@ void RenderForwardMobile::_fill_render_list(RenderListType p_render_list, const
+ #else
+ 				bool force_alpha = false;
+ #endif
++				if (fade_alpha < 0.999f) {
++					force_alpha = true; // Buckdroid: faded instances are drawn in the transparent pass, as in Forward+
++				}
+ 				if (!force_alpha && (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_PASS_OPAQUE)) {
+ 					rl->add_element(surf);
+ 				}
+diff --git a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h
+index 6ab52be..70388d2 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h
++++ b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h
+@@ -450,6 +450,9 @@ protected:
+ 		INSTANCE_DATA_FLAG_MULTIMESH_HAS_CUSTOM_DATA = 1 << 15,
+ 		INSTANCE_DATA_FLAGS_PARTICLE_TRAIL_SHIFT = 16,
+ 		INSTANCE_DATA_FLAGS_PARTICLE_TRAIL_MASK = 0xFF,
++		// Buckdroid: per-instance fade (GeometryInstance3D.transparency, distance fade), as in Forward+.
++		INSTANCE_DATA_FLAGS_FADE_SHIFT = 24,
++		INSTANCE_DATA_FLAGS_FADE_MASK = 0xFFUL << INSTANCE_DATA_FLAGS_FADE_SHIFT
+ 	};
+ 
+ 	struct GeometryInstanceLightmapSH {
+diff --git a/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile.glsl b/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile.glsl
+index c1abc32..2a7e6cb 100644
+--- a/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile.glsl
++++ b/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile.glsl
+@@ -1166,7 +1166,8 @@ void main() {
+ 	float ao_highp = 1.0;
+ 	float ao_light_affect_highp = 0.0;
+ 
+-	float alpha_highp = 1.0;
++	// Buckdroid: per-instance fade (GeometryInstance3D.transparency), ported from Forward+.
++	float alpha_highp = float(instances.data[draw_call.instance_index].flags >> INSTANCE_FLAGS_FADE_SHIFT) / float(255.0);
+ 
+ #if defined(TANGENT_USED) || defined(NORMAL_MAP_USED) || defined(LIGHT_ANISOTROPY_USED) || defined(BENT_NORMAL_MAP_USED)
+ 	vec3 binormal_highp = binormal_interp;
+diff --git a/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl b/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl
+index ad6de05..ffd39c2 100644
+--- a/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl
++++ b/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl
+@@ -250,6 +250,7 @@ layout(set = 0, binding = 2) uniform sampler shadow_sampler;
+ #define INSTANCE_FLAGS_USE_VOXEL_GI (1 << 10)
+ #define INSTANCE_FLAGS_PARTICLES (1 << 11)
+ #define INSTANCE_FLAGS_PARTICLE_TRAIL_SHIFT 16
++#define INSTANCE_FLAGS_FADE_SHIFT 24
+ //3 bits of stride
+ #define INSTANCE_FLAGS_PARTICLE_TRAIL_MASK 0xFF
+ 
+-- 
+2.53.0.windows.2
+
