@@ -188,3 +188,5 @@ Note: the first BuckdroidCompat test run stopped after the menu screenshot (no s
 **Known:** repeated engine errors "BUG, indexing did not unpair geometries from light" and "geom->softshadow_count==0 - BUG!" (also on the unmodified official 4.6 build; no visible effect yet). Old mesh surfaces are upgraded at every load (warning spam; load time). 4.6 launcher activity is GodotAppLauncher.
 
 **Next:** real-play heat session on 4.6 with the user, user playthrough check (menus, all items, endings, endless mode), then Phase 4 controls.
+
+**Heat session 6 (2026-11-24, Godot 4.6.3, short: 6 min of play from 34.2 °C):** skin 36.5 °C, AP 39.0, status 0. fps 60.2, under 55 fps 1%, GPU 12.7 ms (session 5 on 4.1: 12.9), shadow draws/frame 423 (772), median worst frame 20.4 ms (22.1), logger cpu_ms 18.4 (28.4; includes waiting, indicative only). Too short for a temperature comparison; a full 15-20 min session from ~33 °C is still needed.
