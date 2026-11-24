@@ -535,10 +535,9 @@ func _run() -> void:
 			"call":  # call <autoload name> <method> [string arg]
 				var target := get_node_or_null(NodePath("/root/" + p[1]))
 				if target and target.has_method(p[2]):
-					if p.size() > 3:
-						target.call(p[2], p[3])
-					else:
-						target.call(p[2])
+					var ret = target.call(p[2], p[3]) if p.size() > 3 else target.call(p[2])
+					if ret != null:
+						_log("call %s.%s -> %s" % [p[1], p[2], ret])
 				else:
 					_log("call: %s.%s not found" % [p[1], p[2]])
 			"texinfo":  # texinfo <name substring>: materials and texture formats of matching meshes
