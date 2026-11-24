@@ -1,0 +1,82 @@
+From c406790a3e55c08dae6336546c692a72f2572f37 Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 11:35:54 +0300
+Subject: [PATCH 1/2] Buckdroid 46-0001: shadow-update budget for omni lights
+ (paraboloid and cube intervals)
+
+---
+ servers/rendering/renderer_scene_cull.cpp | 23 ++++++++++++++++++++++-
+ servers/rendering/renderer_scene_cull.h   |  1 +
+ servers/rendering/rendering_server.cpp    |  3 +++
+ 3 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/servers/rendering/renderer_scene_cull.cpp b/servers/rendering/renderer_scene_cull.cpp
+index cef93f4..8b1ac58 100644
+--- a/servers/rendering/renderer_scene_cull.cpp
++++ b/servers/rendering/renderer_scene_cull.cpp
+@@ -3476,7 +3476,27 @@ void RendererSceneCull::_render_scene(const RendererSceneRender::CameraData *p_c
+ 			// so that we can turn off tighter caster culling.
+ 			light->detect_light_intersects_multiple_cameras(Engine::get_singleton()->get_frames_drawn());
+ 
+-			if (light->is_shadow_dirty()) {
++			// Buckdroid: shadow-update budget. A changed omni-light shadow is redrawn at most once every N frames
++			// (rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval for dual-paraboloid
++			// lights, .../buckdroid_cube_update_interval for cube lights; 1 = every frame, Godot's behaviour). The change
++			// stays pending and is drawn on a later frame, so nothing is lost; at 60 fps a moving shadow trails by at
++			// most (N - 1) frames.
++			static int bd_parab_interval = -1;
++			static int bd_cube_interval = -1;
++			if (bd_parab_interval < 0) {
++				bd_parab_interval = MAX(1, (int)GLOBAL_GET("rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval"));
++				bd_cube_interval = MAX(1, (int)GLOBAL_GET("rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval"));
++			}
++			uint64_t bd_frame = Engine::get_singleton()->get_frames_drawn();
++			bool bd_deferred = false;
++			if (light->is_shadow_dirty() && RSG::light_storage->light_get_type(ins->base) == RS::LIGHT_OMNI) {
++				int bd_interval = RSG::light_storage->light_omni_get_shadow_mode(ins->base) == RS::LIGHT_OMNI_SHADOW_DUAL_PARABOLOID ? bd_parab_interval : bd_cube_interval;
++				if (bd_interval > 1 && bd_frame - light->bd_last_shadow_frame < (uint64_t)bd_interval) {
++					bd_deferred = true; // keep the change pending; the current shadow stays valid until then
++				}
++			}
++
++			if (light->is_shadow_dirty() && !bd_deferred) {
+ 				// Dirty shadows have no need to be drawn if
+ 				// the light volume doesn't intersect the camera frustum.
+ 
+@@ -3504,6 +3524,7 @@ void RendererSceneCull::_render_scene(const RendererSceneRender::CameraData *p_c
+ 			if (redraw && max_shadows_used < MAX_UPDATE_SHADOWS) {
+ 				//must redraw!
+ 				RENDER_TIMESTAMP("> Render Light3D " + itos(i));
++				light->bd_last_shadow_frame = bd_frame;
+ 				if (_light_instance_update_shadow(ins, p_camera_data->main_transform, p_camera_data->main_projection, p_camera_data->is_orthogonal, p_camera_data->vaspect, p_shadow_atlas, scenario, p_screen_mesh_lod_threshold, p_visible_layers)) {
+ 					light->make_shadow_dirty();
+ 				}
+diff --git a/servers/rendering/renderer_scene_cull.h b/servers/rendering/renderer_scene_cull.h
+index 00104d9..b084a62 100644
+--- a/servers/rendering/renderer_scene_cull.h
++++ b/servers/rendering/renderer_scene_cull.h
+@@ -695,6 +695,7 @@ public:
+ 
+ 		bool uses_projector = false;
+ 		bool uses_softshadow = false;
++		uint64_t bd_last_shadow_frame = 0; // Buckdroid: frame of the last shadow redraw (shadow-update budget)
+ 
+ 		HashSet<Instance *> geometries;
+ 
+diff --git a/servers/rendering/rendering_server.cpp b/servers/rendering/rendering_server.cpp
+index ccaa6d0..8e29b47 100644
+--- a/servers/rendering/rendering_server.cpp
++++ b/servers/rendering/rendering_server.cpp
+@@ -3708,6 +3708,9 @@ void RenderingServer::init() {
+ 	GLOBAL_DEF("rendering/lights_and_shadows/directional_shadow/16_bits", true);
+ 
+ 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality", PROPERTY_HINT_ENUM, "Hard (Fastest),Soft Very Low (Faster),Soft Low (Fast),Soft Medium (Average),Soft High (Slow),Soft Ultra (Slowest)"), 2);
++	// Buckdroid: shadow-update budget for omni lights (1 = every frame, Godot's behaviour).
++	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval", PROPERTY_HINT_RANGE, "1,8,1"), 1);
++	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval", PROPERTY_HINT_RANGE, "1,8,1"), 1);
+ 	GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality.mobile", 0);
+ 	GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_16_bits", true);
+ 
+-- 
+2.53.0.windows.2
+
