@@ -3,7 +3,7 @@
 ## Runs before the game's own autoloads and watches every scene the game enters, so platform changes can be made
 ## from outside the game's scripts. Today it does one thing:
 ##   - multiplayer is unavailable in this port: the main menu's Multiplayer button is greyed out, cannot be pressed
-##     or focused, and says "Coming soon". (The game's multiplayer needs Steam lobbies; see docs/MULTIPLAYER_NOTES.md.)
+##     or focused, and says "Coming soon". (The game's multiplayer needs Steam lobbies; see docs/MULTIPLAYER.md.)
 ## The game keeps running as its Steam edition (GlobalVariables.using_steam stays true); the Steam stub answers.
 extends Node
 
