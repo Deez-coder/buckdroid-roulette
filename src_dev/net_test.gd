@@ -63,7 +63,7 @@ func _read_role() -> void:
 			text = arg.trim_prefix("--bd-net-test=")
 	if text == "" and OS.get_name() == "Android":
 		var parts := OS.get_user_data_dir().split("/", false)
-		var pkg := parts[parts.size() - 1] if parts.size() > 0 else ""
+		var pkg := parts[parts.size() - 2] if parts.size() >= 2 else ""
 		var dev := "/storage/emulated/0/Android/data/%s/files/dev" % pkg
 		log_path = dev.path_join("net_test.log")
 		var f := FileAccess.open(dev.path_join("net_test.txt"), FileAccess.READ)

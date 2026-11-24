@@ -116,3 +116,15 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   extension list (it must be in `res://.godot/extension_list.cfg` of the converted pack and its `.so` in the APK).
 - Whether the game's multiplayer scenes run on 4.6 as they are (the 4.6 adaptations relaxed some exports already).
 - Terms of use of each public signalling service; keep the list configurable.
+
+## Spike results (2026-11-24)
+- `webrtc-native` 1.2.2 built from source with `native/build_webrtc.bat` (Windows and Android arm64; build fixes for this
+  machine in `native/patches/godot-cpp-windows-host.patch`: use the vcvars environment for Visual Studio 2026, archive the
+  Android static library through a response file; Android builds through space-free links in %TEMP%).
+- Loads in Godot 4.6.3 on the PC and on the phone (S24 Ultra) from a pack with `res://.godot/extension_list.cfg`; the
+  library is found by file name in the APK's native library folder.
+- Phone (host) and PC (joiner) on the same Wi-Fi: data channel open 140 ms after signalling, round trip median 14 ms
+  (max 62 ms, includes frame-paced polling), 1 MB at about 12 MB/s.
+- The app now has the INTERNET and ACCESS_NETWORK_STATE permissions (engine patch 46-0011); both are normal permissions,
+  granted at install without a prompt.
+- Not yet checked: loading inside the full converted game, mobile data / NAT traversal (step 4).

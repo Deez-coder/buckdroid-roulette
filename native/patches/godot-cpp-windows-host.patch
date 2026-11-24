@@ -1,0 +1,73 @@
+diff --git a/tools/android.py b/tools/android.py
+index e63c1fd..d2a2488 100644
+--- a/tools/android.py
++++ b/tools/android.py
+@@ -1,3 +1,4 @@
++import SCons.Action
+ import os
+ import sys
+ 
+@@ -34,6 +35,23 @@ def get_android_ndk_root(env):
+         return os.environ.get("ANDROID_NDK_ROOT")
+ 
+ 
++
++def _archive_with_response_file(target, source, env):
++    import subprocess, tempfile
++    rsp = tempfile.NamedTemporaryFile("w", suffix=".rsp", delete=False)
++    rsp.write(chr(10).join(str(f).replace(chr(92), "/") for f in source))
++    rsp.close()
++    out = str(target[0])
++    if os.path.exists(out):
++        os.remove(out)
++    ar = env.subst("$AR")
++    if not ar.endswith(".exe"):
++        ar += ".exe"
++    rc = subprocess.call([ar] + env.subst("$ARFLAGS").split() + [out, "@" + rsp.name])
++    os.remove(rsp.name)
++    return rc
++
++
+ def generate(env):
+     if get_android_ndk_root(env) is None:
+         raise ValueError(
+@@ -107,6 +125,9 @@ def generate(env):
+     env["CXX"] = toolchain + "/bin/clang++"
+     env["LINK"] = toolchain + "/bin/clang++"
+     env["AR"] = toolchain + "/bin/llvm-ar"
++    if sys.platform == "win32":
++        # Buckdroid: about 1000 object files exceed Windows' command-line limit; archive them with a response file.
++        env["ARCOM"] = SCons.Action.Action(_archive_with_response_file, "$ARCOMSTR")
+     env["AS"] = toolchain + "/bin/llvm-as"
+     env["STRIP"] = toolchain + "/bin/llvm-strip"
+     env["RANLIB"] = toolchain + "/bin/llvm-ranlib"
+diff --git a/tools/windows.py b/tools/windows.py
+index 9aad0d8..c61c418 100644
+--- a/tools/windows.py
++++ b/tools/windows.py
+@@ -88,7 +88,7 @@ def exists(env):
+ 
+ 
+ def generate(env):
+-    if not env["use_mingw"] and msvc.exists(env):
++    if not env["use_mingw"] and ("VCINSTALLDIR" in os.environ or msvc.exists(env)):
+         if env["arch"] == "x86_64":
+             env["TARGET_ARCH"] = "amd64"
+         elif env["arch"] == "arm64":
+@@ -105,7 +105,15 @@ def generate(env):
+         env["is_msvc"] = True
+ 
+         # MSVC, linker, and archiver.
+-        msvc.generate(env)
++        if "VCINSTALLDIR" in os.environ:
++            # Buckdroid: inside a Developer Command Prompt (vcvars64.bat) use its environment; SCons may not know the
++            # installed Visual Studio version (VS 2026 / MSVC 14.5x).
++            env["MSVC_USE_SCRIPT"] = False
++            env["MSVC_VERSION"] = env["MSVS_VERSION"] = "14.3"  # any version SCons knows; only used for flags
++            for k in ("PATH", "INCLUDE", "LIB", "LIBPATH"):
++                env["ENV"][k] = os.environ.get(k, "")
++        else:
++            msvc.generate(env)
+         env.Tool("msvc")
+         env.Tool("mslib")
+         env.Tool("mslink")

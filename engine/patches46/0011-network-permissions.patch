@@ -1,0 +1,28 @@
+From 7834e921419691bec55b3cf6abe5542aae7c365f Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Tue, 24 Nov 2026 22:06:59 +0300
+Subject: [PATCH] Buckdroid: network permissions for multiplayer (INTERNET,
+ ACCESS_NETWORK_STATE)
+
+---
+ platform/android/java/app/src/main/AndroidManifest.xml | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/platform/android/java/app/src/main/AndroidManifest.xml b/platform/android/java/app/src/main/AndroidManifest.xml
+index ee9765e..7587219 100644
+--- a/platform/android/java/app/src/main/AndroidManifest.xml
++++ b/platform/android/java/app/src/main/AndroidManifest.xml
+@@ -15,6 +15,10 @@
+         android:glEsVersion="0x00030000"
+         android:required="true" />
+ 
++    <!-- Buckdroid: multiplayer (peer-to-peer connections). Normal permissions: granted at install, no prompt. -->
++    <uses-permission android:name="android.permission.INTERNET" />
++    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
++
+     <application
+         android:label="Buckdroid Roulette"
+         android:allowBackup="false"
+-- 
+2.53.0.windows.2
+
