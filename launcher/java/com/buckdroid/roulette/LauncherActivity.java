@@ -243,6 +243,22 @@ public class LauncherActivity extends KitActivity {
         }
         content.addView(t);
 
+        LinearLayout ob = card();
+        ob.addView(header("On-screen buttons"));
+        ob.addView(choice(c, "touch_pad", "Show", new String[]{"off", "auto", "on"}, new String[]{"Off", "Auto", "Always"}, "off",
+                "A D-pad, A, B and a menu button over the game, for playing the game's controller way. Tapping the game still "
+                        + "works. Auto hides them while a controller is used. Applies the next time the game starts."));
+        if (!"off".equalsIgnoreCase(c.get("touch_pad", "off"))) {
+            ob.addView(slider(c, "touch_opacity", "Opacity", 10, 100, 5, 45, "%", 0.01f, null));
+            ob.addView(slider(c, "touch_scale", "Size", 60, 160, 5, 100, "%", 0.01f, null));
+            ob.addView(space(6));
+            Button edit = button("Edit button layout", ACCENT2);
+            edit.setOnClickListener(v -> startActivity(new Intent(this, TouchLayoutEditorActivity.class)
+                    .putExtra(TouchLayoutEditorActivity.EXTRA_FILE, new File(config, "controls.ini").getAbsolutePath())));
+            ob.addView(edit, fullWidth(48));
+        }
+        content.addView(ob);
+
         LinearLayout pad = card();
         pad.addView(header("Controller"));
         pad.addView(text("Bluetooth and USB controllers work in the game's own way: the D-pad or stick picks, A confirms.",

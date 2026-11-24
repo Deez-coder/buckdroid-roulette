@@ -125,6 +125,11 @@ cursor_speed = 1.00
 cursor_size = 1.00
 ; Direct mode: a tap that misses goes to the nearest object you can use (easier to hit small items). on or off.
 tap_assist = off
+; On-screen buttons over the game (D-pad, A, B, menu), read by the app's game screen: off (default), auto (hidden while
+; a controller is used) or on. Opacity 0.1 - 1, size 0.6 - 1.6; pos_<button> = x y size lines come from the layout editor.
+touch_pad = off
+touch_opacity = 0.45
+touch_scale = 1.00
 """,
 }
 
