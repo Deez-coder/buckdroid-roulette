@@ -17,7 +17,7 @@ from ecfg import ProjectBinary, encode  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENGINE = (4, 6, 3)
-PAYLOAD_EXT = (".gd", ".tscn", ".tres", ".png", ".svg", ".json", ".cfg")  # same filter as build_patched_pck.py
+PAYLOAD_EXT = (".gd", ".tscn", ".tres", ".png", ".svg", ".json", ".cfg", ".gdextension")  # same filter as build_patched_pck.py
 
 MAIN_SCENE = """[gd_scene load_steps=2 format=3]
 

@@ -14,6 +14,10 @@
       "script": "platform/platform.gd"
     },
     {
+      "name": "BuckdroidNet",
+      "script": "net/session.gd"
+    },
+    {
       "name": "Steam",
       "script": "platform/steam_stub.gd"
     },

@@ -175,6 +175,9 @@ final class Converter implements Runnable {
             /* Our scripts */
             Map<String, byte[]> ours = new LinkedHashMap<>();
             collectPayload(ctx.getAssets(), "payload/buckdroid", ours);
+            /* Multiplayer: Godot loads the WebRTC GDExtension listed here (its library is in the APK). */
+            ours.put("res://.godot/extension_list.cfg",
+                    "res://buckdroid/net/webrtc.gdextension\n".getBytes(StandardCharsets.UTF_8));
 
             write(replaced, converted, ours);
             deleteTree(work);

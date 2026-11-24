@@ -87,7 +87,7 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
 
 ### Consistency
 - Reliable ordered channels match what the game expects from Steam reliable packets.
-- Heartbeats every 2 s; a peer silent for 10 s counts as gone, reported to the game as `lobby_chat_update` LEFT.
+- Heartbeats every 2 s; a peer counts as gone when its WebRTC connection fails or after 60 s of silence (loading a match can freeze a game for several seconds), reported to the game as `lobby_chat_update` LEFT.
 - Network changes (Wi-Fi to mobile data): ICE restart within a 15 s grace period before counting the peer as gone.
 - Our handshake carries the protocol version and the converted game's version (from versions.json); mismatches are
   refused with a clear message before the game's own version check.

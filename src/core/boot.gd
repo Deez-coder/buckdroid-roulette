@@ -2,8 +2,9 @@
 ##
 ## Runs before the game's own autoloads and watches every scene the game enters, so platform changes can be made
 ## from outside the game's scripts. Today it does one thing:
-##   - multiplayer is unavailable in this port: the main menu's Multiplayer button is greyed out, cannot be pressed
-##     or focused, and says "Coming soon". (The game's multiplayer needs Steam lobbies; see docs/MULTIPLAYER.md.)
+##   - when multiplayer cannot work (the WebRTC GDExtension behind BuckdroidNet is missing), the main menu's Multiplayer
+##     button is greyed out, cannot be pressed or focused, and says "Coming soon". Otherwise it is left alone and the
+##     game's multiplayer runs on our peer-to-peer layer (see docs/MULTIPLAYER.md).
 ## The game keeps running as its Steam edition (GlobalVariables.using_steam stays true); the Steam stub answers.
 extends Node
 
@@ -27,7 +28,9 @@ func _on_scene_changed(scene: Node) -> void:
 	if not is_instance_valid(scene):
 		return
 	if scene.scene_file_path == MENU_SCENE:
-		_disable_multiplayer_button(scene)
+		var net := get_node_or_null(^"/root/BuckdroidNet")
+		if net == null or not net.available:
+			_disable_multiplayer_button(scene)
 
 
 func _disable_multiplayer_button(scene: Node) -> void:

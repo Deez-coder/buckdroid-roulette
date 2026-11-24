@@ -72,6 +72,39 @@ func _run() -> void:
 				_log("scene: " + (s.scene_file_path if s else "<none>"))
 			"tap":
 				await _touch(_to_window(Vector2(float(p[1]), float(p[2]))))
+			"callscript":  # callscript <script file> <method> [args]: call a game script's method (numbers become ints)
+				var target := _find_by_script(get_tree().root, p[1])
+				if target == null:
+					_log("callscript: no node with script " + p[1])
+				else:
+					var args := []
+					for a in p.slice(3):
+						args.append(int(a) if a.is_valid_int() else a)
+					_log("callscript %s.%s%s -> %s" % [p[1], p[2], args, target.callv(p[2], args)])
+			"savelobby":  # savelobby <file>: write the current lobby ID (multiplayer tests with two copies)
+				var gs := get_node_or_null(^"/root/GlobalSteam")
+				var lid: int = gs.LOBBY_ID if gs else 0
+				var f := FileAccess.open(p[1], FileAccess.WRITE)
+				if f:
+					f.store_string(str(lid))
+				_log("lobby %d saved to %s" % [lid, p[1]])
+			"joinsaved":  # joinsaved <file>: wait (up to 60 s) for a saved lobby ID, then join it through the game
+				var waited := 0.0
+				while not FileAccess.file_exists(p[1]) and waited < 60.0:
+					await get_tree().create_timer(0.5, true, false, true).timeout
+					waited += 0.5
+				var lid := int(FileAccess.get_file_as_string(p[1]).strip_edges())
+				var lm := _find_by_script(get_tree().root, "MP_LobbyManager.gd")
+				_log("joining lobby %d (lobby manager %s)" % [lid, lm != null])
+				if lm:
+					lm.join_lobby(lid)
+			"net":  # net: log the multiplayer state
+				var net := get_node_or_null(^"/root/BuckdroidNet")
+				var gs := get_node_or_null(^"/root/GlobalSteam")
+				if net:
+					_log("net: lobby %d host %s owner %d members %s | game: LOBBY_ID %s HOST_ID %s MEMBERS %s" % [net.lobby_id,
+							net.is_host, net.owner_id, net.members, gs.LOBBY_ID if gs else "?", gs.HOST_ID if gs else "?",
+							gs.LOBBY_MEMBERS if gs else "?"])
 			"where":  # where <name substring with _ for spaces>: world positions of matching 3D nodes, and the camera
 				var needle := p[1].replace("_", " ").to_lower()
 				var cam := get_viewport().get_camera_3d()
