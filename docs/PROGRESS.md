@@ -276,3 +276,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   - CPU: no game script or animation is measurably expensive (procscan, animscan, treescan); the phone's higher CPU in
     the match is most likely the renderer recording the shadow passes, which the changes above also reduce.
   - Not measured on the phone yet (it was disconnected): next heat run in a multiplayer match.
+- 2026-11-25, launcher quick update (*choice*): convert_status.json now records a fingerprint of the app's payload
+  (Converter.payloadHash over assets/payload). When the launcher opens and the converted game carries older scripts,
+  it rewrites game.pck with the new res://buckdroid/* files, autoload list and extension list, copying every game file
+  unchanged (no texture conversion, no game file needed), with the usual progress bar. The home-screen shortcut goes
+  through the launcher in that case. Built, not yet run on the phone (disconnected).

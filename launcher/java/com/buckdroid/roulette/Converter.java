@@ -56,6 +56,7 @@ final class Converter implements Runnable {
     private final Context ctx;
     private final Uri source;
     private final File out, status, work;
+    private boolean refreshOnly;          /* only Buckdroid's own scripts change (see refresh) */
 
     private Converter(Context c, Uri source, File out, File status) {
         this.ctx = c.getApplicationContext();
@@ -75,6 +76,74 @@ final class Converter implements Runnable {
         return current;
     }
 
+    /* Quick update after an app update: the converted game.pck gets this app's scripts (res://buckdroid/*), autoload
+     * list and extension list; every game file is copied as it is (no texture conversion, about a minute). */
+    static synchronized Converter refresh(Context c, File out, File status) {
+        if (current != null && "running".equals(current.state)) return current;
+        current = new Converter(c, null, out, status);
+        current.refreshOnly = true;
+        Thread t = new Thread(current, "buckdroid-refresh");
+        t.setPriority(Thread.NORM_PRIORITY - 1);
+        t.start();
+        return current;
+    }
+
+    /* A fingerprint of this app's payload (our scripts and data under assets/payload); kept in convert_status.json so the
+     * launcher knows when the converted game has older scripts than the app. */
+    private static String payloadHash;
+
+    static synchronized String payloadHash(Context c) {
+        if (payloadHash != null) return payloadHash;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            hashAssets(c.getAssets(), "payload", md);
+            payloadHash = hex(md.digest());
+        } catch (Exception e) {
+            payloadHash = "";
+        }
+        return payloadHash;
+    }
+
+    private static void hashAssets(AssetManager am, String dir, MessageDigest md) throws Exception {
+        String[] names = am.list(dir);
+        if (names == null) return;
+        java.util.Arrays.sort(names);
+        for (String n : names) {
+            String p = dir + "/" + n;
+            String[] sub = am.list(p);
+            if (sub != null && sub.length > 0) hashAssets(am, p, md);
+            else try (InputStream in = am.open(p)) {
+                md.update(p.getBytes(StandardCharsets.UTF_8));
+                md.update(KitActivity.readAll(in));
+            }
+        }
+    }
+
+    private void refreshScripts() throws Exception {
+        set("Updating the game", "Buckdroid's scripts", 0f);
+        JSONArray autoloads = new JSONObject(asset("payload/autoloads.json")).getJSONArray("autoloads");
+        src = new FileInputStream(out).getChannel();
+        readPck();
+        if (!byPath.containsKey("res://project.binary")) throw new Fail("The converted game could not be read. Set it up again.");
+        Ecfg pb = new Ecfg(read("res://project.binary"));
+        pb.items.removeIf(it -> it[0].startsWith("autoload/") && it[1].contains("res://buckdroid/"));
+        String firstGameAutoload = null;
+        for (String[] it : pb.items) if (it[0].startsWith("autoload/")) { firstGameAutoload = it[0]; break; }
+        for (int i = 0; i < autoloads.length(); i++) {
+            JSONObject a = autoloads.getJSONObject(i);
+            pb.insertBefore(firstGameAutoload, "autoload/" + a.getString("name"), "*res://buckdroid/" + a.getString("script"));
+        }
+        Map<String, byte[]> replaced = new LinkedHashMap<>();
+        replaced.put("res://project.binary", pb.toBytes());
+        entries.removeIf(e -> e.path.startsWith("res://buckdroid/"));      /* scripts the new version no longer has */
+        Map<String, byte[]> ours = new LinkedHashMap<>();
+        collectPayload(ctx.getAssets(), "payload/buckdroid", ours);
+        ours.put("res://.godot/extension_list.cfg", "res://buckdroid/net/webrtc.gdextension\n".getBytes(StandardCharsets.UTF_8));
+        write(replaced, new LinkedHashMap<>(), ours);
+        set("Done", "The game is up to date.", 1f);
+        state = "done";
+    }
+
     static final class Entry { String path; long offset, size; byte[] md5; }
 
     private FileChannel src;
@@ -86,6 +155,10 @@ final class Converter implements Runnable {
     @Override public void run() {
         ParcelFileDescriptor pfd = null;
         try {
+            if (refreshOnly) {
+                refreshScripts();
+                return;
+            }
             deleteTree(work);
             work.mkdirs();
             set("Checking the game file", "", 0f);
@@ -278,6 +351,7 @@ final class Converter implements Runnable {
         try {
             JSONObject o = new JSONObject();
             o.put("state", state).put("phase", phase).put("detail", detail).put("message", message).put("fraction", fraction);
+            if ("done".equals(state)) o.put("payload", payloadHash(ctx));
             try (FileOutputStream f = new FileOutputStream(status)) { f.write(o.toString().getBytes(StandardCharsets.UTF_8)); }
         } catch (Exception ignored) { }
     }

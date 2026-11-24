@@ -47,7 +47,7 @@ public class LauncherActivity extends KitActivity {
         new File(root, "converter.pck").delete();
         statusFile = new File(root, "convert_status.json");
         /* Started from the home-screen shortcut: go straight into the game. */
-        if (ACTION_PLAY.equals(getIntent().getAction()) && gameReady() && !converting()) {
+        if (ACTION_PLAY.equals(getIntent().getAction()) && gameReady() && scriptsCurrent() && !converting()) {
             super.onCreate(b);
             startActivity(new Intent().setClassName(this, GAME_ACTIVITY));
             finish();
@@ -105,8 +105,19 @@ public class LauncherActivity extends KitActivity {
 
     static boolean converting() { Converter c = Converter.current; return c != null && "running".equals(c.state); }
 
+    /* Whether the converted game carries this app version's scripts (Converter.payloadHash). */
+    boolean scriptsCurrent() {
+        JSONObject s = status();
+        return s != null && Converter.payloadHash(this).equals(s.optString("payload"));
+    }
+
     @Override protected void onResume() {
         super.onResume();
+        /* After an app update: give the converted game the new scripts first (a minute; no game file needed). */
+        if (!converting() && gameReady() && !scriptsCurrent()) {
+            Converter.refresh(this, gamePck, statusFile);
+            show(0);
+        }
         ui.removeCallbacks(tick);
         if (converting()) ui.post(tick);
     }
