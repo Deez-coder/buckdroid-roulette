@@ -256,3 +256,15 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
 - 2026-11-24, multiplayer spike passed: WebRTC plugin (built from source) loads on 4.6 on PC and phone; phone-PC direct data channel over Wi-Fi works (14 ms median round trip, 12 MB/s). Details in docs/MULTIPLAYER.md.
 - 2026-11-24, multiplayer works on the local network: phone hosts, PC joins, match in sync (user confirmed). BuckdroidNet behind the Steam stub; details in docs/MULTIPLAYER.md.
 - 2026-11-24, online multiplayer by room code works: phone on mobile data hosted, PC on home Wi-Fi joined directly through public encrypted signalling. Lobby ID shown as text on the lobby screen.
+- 2026-11-25, multiplayer table performance (user away; *choice* = decided by Claude). Phone in a 2-player match:
+  about 49 fps, GPU 19-20 ms, thermal headroom up to 0.87 (single player holds 60). PC measurements with phone
+  settings (Mobile renderer, mixed shadows, 16-slot atlas), match on two PC copies:
+  - The table scene has 10 shadow-casting lights; the shadow pass was 2.1-3.7 million triangles per frame against 0.14
+    million for the visible picture, redrawn every frame because the players' models always animate.
+  - *choice* Outdoor DirectionalLights (moon, wall; 4 cascades each) hidden while the camera is inside the club: no
+    visible difference from six directions including the window; GPU 2.5 -> 1.9 ms, shadow triangles 2.1 -> 1.7 M.
+  - *choice* mixed mode: the club's strong lights get dual-paraboloid shadows in the multiplayer scene (the cube rule
+    protects the dealer's face, and there is no dealer): about 30% fewer shadow triangles; only soft falloff in a few
+    dark corners differs. PC "cube" mode keeps the original look.
+  - Tried and dropped: mesh_detail / LOD (about 1% fewer shadow triangles), excluding the street's geometry from the
+    indoor lights' shadows (Godot already culls it: no change).
