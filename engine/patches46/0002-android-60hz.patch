@@ -1,7 +1,7 @@
 From f1e9bd9a9e00911b357d9ac3271af567e4c453c2 Mon Sep 17 00:00:00 2001
 From: buckdroid <buckdroid@localhost>
 Date: Tue, 24 Nov 2026 11:36:35 +0300
-Subject: [PATCH 2/2] Buckdroid 46-0002: Android 60 Hz request and touch boost
+Subject: [PATCH 2/3] Buckdroid 46-0002: Android 60 Hz request and touch boost
  off (ports 0003/0004)
 
 ---
