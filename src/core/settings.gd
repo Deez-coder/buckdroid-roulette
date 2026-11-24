@@ -54,8 +54,10 @@ func _ready() -> void:
 func _apply_engine_settings() -> void:
 	var refresh := get_value("graphics", "shadow_refresh")
 	if refresh.is_valid_int():
-		ProjectSettings.set_setting("rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval", clampi(int(refresh), 1, 8))
-		print("[buckdroid] shadow refresh: big lights every %d frame(s)" % clampi(int(refresh), 1, 8))
+		var n := clampi(int(refresh), 1, 8)
+		ProjectSettings.set_setting("rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval", n)
+		ProjectSettings.set_setting("rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval", n)
+		print("[buckdroid] shadow refresh: lights redraw moving shadows every %d frame(s)" % n)
 
 
 func get_value(file: String, key: String) -> String:
@@ -97,8 +99,8 @@ fps_counter = off
 idle_fps =
 ; 3D resolution, from 0.5 to 1.0 (1.0 = full). Lower is cooler and faster but softer; menus and text stay sharp.
 render_scale = 1.0
-; How often the big lights redraw their shadows: 1 = every frame (original), 2 or 3 = every 2nd/3rd frame.
-; 3 makes a moving shadow trail by at most 1/30 s and cuts GPU load by about 13% (cooler phone). Empty = automatic (3 on phones).
+; How often lights redraw moving shadows: 1 = every frame (original, default), 2 or 3 = every 2nd/3rd frame.
+; 3 saves about 12% GPU load (cooler phone) but moving shadows visibly lag and lifted items can flash dark.
 shadow_refresh =
 ; Shadow map size: 4096 (original), 2048 or 1024. Smaller saves a little GPU work; shadow edges get slightly coarser.
 shadow_resolution =
