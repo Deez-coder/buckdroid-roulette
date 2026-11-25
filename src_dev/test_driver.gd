@@ -188,6 +188,19 @@ func _run() -> void:
 				bootn2._entry.text = raw2.substr(0, 9) + " " + raw2.substr(9)
 				bootn2._join_typed()
 				_log("typed '%s', note '%s'" % [bootn2._entry.text, bootn2._entry_note.text])
+			"chatsay":  # chatsay <text, + for spaces>: open the chat with a real tap on CHAT (if closed), type, tap SEND
+				var chat := get_node_or_null(^"/root/BuckdroidChat")
+				if not chat._panel.visible:
+					await _touch(_to_window(chat._button.get_global_rect().get_center()))
+					await get_tree().create_timer(0.3).timeout
+				await _touch(_to_window(chat._entry.get_global_rect().get_center()))
+				chat._entry.text = p[1].replace("+", " ")
+				var send_btn: Control = chat._overlay[4]   # registered in order: CHAT, panel, CLOSE, field, SEND
+				await _touch(_to_window(send_btn.get_global_rect().get_center()))
+				_log("chatsay: panel %s, focus %s, entry now '%s'" % [chat._panel.visible, chat._entry.has_focus(), chat._entry.text])
+			"chatlog":  # chatlog: the chat lines received so far and the CHAT button's text
+				var chat2 := get_node_or_null(^"/root/BuckdroidChat")
+				_log("chatlog: shown %s, button '%s', popup '%s', lines %s" % [chat2._layer.visible, chat2._button.text, chat2._popup.text, chat2._lines])
 			"inputmap":  # inputmap <action, + for spaces>: the events bound to an action
 				var an := p[1].replace("+", " ")
 				if InputMap.has_action(an):

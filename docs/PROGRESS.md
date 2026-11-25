@@ -362,3 +362,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   shadows every 2nd frame. Measured on the phone in a match, both directions: no step 527, step 1 (half atlas) 471
   (-11%), step 2 (+ every 2nd frame) 430 (-18%), back to 472 / 527.
 - 2026-11-25 lobby ID fix (tester report: "clipboard does not contain a valid lobby ID"): the game only accepts an 18-character pasted ID (a Steam lobby ID); ours had 16 digits, so pasting never worked (tests had called join_lobby directly). Lobby IDs are now 18 digits; on the lobby screen the clipboard is cleaned to the bare digits when the app regains focus (only text made of digits and spaces/dashes with exactly 18 digits; read only then, since Android shows a notice on every clipboard read); a "TYPE A LOBBY ID" box with the number keyboard joins through the game's own join_lobby; the ID is shown in groups of three. Tested on the PC over the internet path: pasted with spaces and typed both join.
+- 2026-11-25 chat and all-mode lobby controls (user request while a tester tried the build): in-game chat (BuckdroidChat,
+  details in docs/MULTIPLAYER.md). Our boxes take their taps before the game turns them into clicks. Buttons mode: the
+  on-screen pad passes every tap through on the menu and lobby screens (so the game's paste/join/lobby buttons work) and
+  taps on our boxes during a match. Tested with two PC copies over the internet path: lobby and match, both directions,
+  unread count and popup; layout checked in screenshots.

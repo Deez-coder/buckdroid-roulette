@@ -61,6 +61,7 @@ var _press_sent := false
 var _release_pending: InputEvent = null
 var _last_pos := Vector2.ZERO
 var _debug := OS.get_cmdline_user_args().has("--bd-touch-debug")
+var _overlay_touch := false       # the finger went down on one of our own boxes (BuckdroidChat.consume_tap)
 
 # relative mode
 var _cursor := Vector2(480, 270)   # game base coordinates
@@ -122,7 +123,18 @@ func _input(event: InputEvent) -> void:
 		_input_direct(event)
 
 
+## Our own boxes (chat, lobby ID entry) take a tap before the game sees it as a click.
+func _overlay_tap(pos: Vector2) -> bool:
+	var chat := get_node_or_null(^"/root/BuckdroidChat")
+	return chat != null and chat.consume_tap(pos)
+
+
 func _input_direct(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.index == 0 and (_overlay_touch or (event.pressed and _overlay_tap(event.position))):
+		_overlay_touch = event.pressed
+		return
+	if event is InputEventScreenDrag and event.index == 0 and _overlay_touch:
+		return
 	if event is InputEventScreenTouch and event.index == 0:
 		if event.pressed:
 			_finger_down = true
@@ -152,6 +164,8 @@ func _input_relative(event: InputEvent) -> void:
 		elif _finger_down:
 			_finger_down = false
 			if _rel_moved < TAP_SLOP and Time.get_ticks_msec() - _rel_start_ms <= TAP_TIME_MS:
+				if _overlay_tap(_cursor):
+					return
 				# The cursor has been resting on its target, so the game already knows what is under it.
 				_press_sent = false
 				_queue.append({"frames_left": 0, "event": _button(_cursor, true)})

@@ -30,6 +30,10 @@
       "script": "ui/toast.gd"
     },
     {
+      "name": "BuckdroidChat",
+      "script": "ui/chat.gd"
+    },
+    {
       "name": "BuckdroidTouch",
       "script": "input/touch_adapter.gd"
     },

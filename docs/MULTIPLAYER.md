@@ -95,10 +95,16 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   migration (clients reconnecting to a new host) is a later step.
 
 ### In-game chat
-- A small chat button in the lobby and during a multiplayer match opens a chat box (last 50 messages, text field).
-- Messages go over the chat channel to the host, which forwards them (same star). Plain text only (no BBCode or links
-  rendered), 200 characters, 1 message per second per player, shown with the sender's nickname.
-- Per-player mute; a launcher setting turns chat off entirely.
+- Done (src/ui/chat.gd, BuckdroidChat): a CHAT button at the top right in the lobby and during a multiplayer match opens
+  a chat box (last 40 messages kept, 9 shown, text field, SEND). The box lifts above the phone keyboard while typing.
+  While it is closed, a new message shows for 4 s under the button and the button counts unread messages.
+- Messages go to the host, which forwards them (same star). Plain text only (control characters removed, no BBCode),
+  200 characters, 1 message per second per player, shown with the sender's nickname. The launcher's chat switch
+  (multiplayer.ini chat) turns it off entirely.
+- Taps on our own boxes are handled before the game sees them (BuckdroidChat.consume_tap, called by BuckdroidTouch), so
+  they never also click the table or the lobby behind them. In Buttons mode the on-screen pad lets taps through on menu
+  and lobby screens and on our boxes (TouchPad.setPassThrough / setPassRects).
+- Later: per-player mute.
 
 ## Steps
 1. **Spike:** build `webrtc-native` for Android arm64 and Windows, load it from our payload in the converted game, and

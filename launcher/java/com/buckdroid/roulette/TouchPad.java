@@ -57,6 +57,20 @@ public final class TouchPad extends View {
     int sent;                                      /* the joypad buttons Godot has as pressed, bits by TouchLayout index */
     float aspect = 16f / 9f;
 
+    /* ------------------------------------------------------------ pass-through, set from GDScript (BuckdroidChat) */
+    static volatile boolean passAll = false;
+    static volatile float[] passRects = new float[0];   /* x0, y0, x1, y1 per area, parts of the screen */
+
+    public static void setPassThrough(boolean all) { passAll = all; }
+    public static void setPassRects(float[] rects) { passRects = rects != null ? rects : new float[0]; }
+
+    static boolean inPassRect(float x, float y) {
+        float[] r = passRects;
+        for (int i = 0; i + 3 < r.length; i += 4)
+            if (x >= r[i] && y >= r[i + 1] && x <= r[i + 2] && y <= r[i + 3]) return true;
+        return false;
+    }
+
     /* Puts the buttons over the game when touch_mode is pad; returns null otherwise. */
     public static TouchPad attach(Activity a) {
         File f = new File(new File(a.getExternalFilesDir(null), "config"), "controls.ini");
@@ -133,6 +147,9 @@ public final class TouchPad extends View {
             /* A new gesture. Every touch is ours (taps on the game are off in this mode); only buttons do something. */
             float x = e.getX() / W, y = e.getY() / H;
             if (!on) return false;
+            /* Pass-through (set by the game's scripts): on menu and lobby screens every touch that is not on a pad
+             * button reaches the game, and during play touches on our own screen boxes (chat, lobby ID entry) do. */
+            if (hitButton(x, y) < 0 && !onRing(x, y) && (passAll || inPassRect(x, y))) return false;
             if (onRing(x, y)) { hiddenByRing = !hiddenByRing; hiddenByController = false; release(); invalidate(); return true; }
             if (hiddenByController) { hiddenByController = false; invalidate(); return true; }
             if (!shown()) return true;

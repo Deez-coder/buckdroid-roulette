@@ -22,9 +22,11 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 - Same Wi-Fi works best; over mobile data most networks work, some strict ones do not (the app says so).
 - Look around: two fingers (one finger on an empty spot in Buttons mode, or a controller's left trigger + stick).
 - Players in a lobby can see each other's internet address, as in any peer-to-peer game.
+- Chat: tap CHAT (top right, in the lobby and during a match). New messages show briefly under the button while the
+  box is closed. Chat can be turned off in the launcher (Game tab, Multiplayer).
+- The lobby buttons, the lobby ID box and the chat work in every control mode, Buttons mode included.
 
 ## Known issues
-- No in-game chat yet.
 - The phone gets warmer in multiplayer than in single player; the heat guard eases graphics when it gets hot.
   "Cooler shadows" (Graphics) runs cooler with almost no visible difference.
 - The screen can still switch to 120 Hz briefly while touching (some phones).

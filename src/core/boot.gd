@@ -77,6 +77,16 @@ func _update_lobby_code(scene: Node) -> void:
 	if not on_screen:
 		_code_shown = -1
 		return
+	# While typing on a phone, keep the entry box above the on-screen keyboard.
+	if _panel.visible:
+		var chat := get_node_or_null(^"/root/BuckdroidChat")
+		var kb: float = chat.keyboard_top() if chat and _entry.has_focus() else 1e9
+		var half_h := 95.0
+		var centre := get_viewport().get_visible_rect().size.y / 2.0
+		var shift := minf(0.0, kb - 8.0 - (centre + half_h))
+		shift = maxf(shift, 8.0 - (centre - half_h))
+		_panel.offset_top = -half_h + shift
+		_panel.offset_bottom = half_h + shift
 	var gs := get_node_or_null(^"/root/GlobalSteam")
 	var id: int = gs.LOBBY_ID if gs else 0
 	if id == _code_shown:
@@ -142,6 +152,11 @@ func _build_lobby_ui(scene: Node) -> void:
 		row.add_child(cancel)
 		box.add_child(row)
 		_code_layer.add_child(_panel)
+		# Taps on these go to them only, not also to the game's lobby buttons behind (BuckdroidChat routes them).
+		var chat := get_node_or_null(^"/root/BuckdroidChat")
+		if chat:
+			for c: Control in [_type_button, _panel, _entry, join, cancel]:
+				chat.register(c)
 	_style_like_lobby(scene)
 	_code_layer.visible = true
 	_panel.visible = false
