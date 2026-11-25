@@ -348,3 +348,9 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
 - Patches 46-0013 (back-facing omni shadow lookups skipped) and 46-0014 (Android: unchanged custom cursor updates
   skipped; the game set its cursor every frame, which did Java asset lookups each time, ~4% of the game thread):
   installed; no measurable change in GPU clock; game thread ~101% of a core over 10 s.
+- 2026-11-25, shadow fix (user choice: lighter shadow meshes first). Simplified shadow meshes (ImporterMesh.
+  generate_lods, half the triangles, 32 casters, 111k -> 56k triangles) measured on the phone: load 540 -> 530 (-2%):
+  triangles are not the cost; removed again. The cost is memory traffic: the ten table-light shadow passes per frame
+  each write their 32-bit atlas region. 16-bit atlas: load 540 -> 353 (-34%), GPU ~640 -> 485 MHz, table view
+  identical (0.08% of pixels). Single player: no load difference (cached shadows, 282 vs 277) and the dealer's face
+  was the reason for 32 bits on 4.1, so *choice*: 16-bit atlas only in the multiplayer match (BuckdroidRender #7).
