@@ -78,6 +78,8 @@ var _raycast_camera: Camera3D = null  # the game's MouseRaycast camera
 # cursor overlay
 var _layer: CanvasLayer
 var _cursor_rect: TextureRect
+var _cursor_log_state := ""        # diagnostics: the last logged reason for the trackpad cursor's visibility
+var _cursor_log_time := 0.0
 var _fallback_texture: Texture2D
 var _fallback_hotspot := Vector2.ZERO
 
@@ -467,8 +469,32 @@ func _update_cursor() -> void:
 		tex = _fallback_texture
 		hotspot = _fallback_hotspot
 	_cursor_rect.visible = show and tex != null
+	if mode == "relative":
+		_log_cursor_state(show and tex != null, scene)
 	if _cursor_rect.visible:
 		_cursor_rect.texture = tex
 		_cursor_rect.size = tex.get_size()
 		_cursor_rect.scale = Vector2.ONE * cursor_size
 		_cursor_rect.position = _cursor - hotspot * cursor_size
+
+
+## Diagnostics (tester reports of the trackpad cursor staying hidden): logs every change of the cursor's visibility with
+## what decided it, and every 10 s while it stays hidden in a multiplayer scene. Shows up in Export logs.
+func _log_cursor_state(drawn: bool, scene: Node) -> void:
+	var mp := "-"
+	if scene and scene.scene_file_path.begins_with("res://multiplayer/"):
+		var mpc: Node = null
+		for n in scene.find_children("*", "Node", true, false):
+			var sc: Script = n.get_script()
+			if sc and sc.resource_path.get_file() == "MP_CursorManager.gd":
+				mpc = n
+				break
+		if mpc:
+			mp = "cursor_visible=%s controller_active=%s" % [mpc.get("cursor_visible"), mpc.get("controller_active")]
+	var state := "%s mouse_mode=%d %s scene=%s" % ["shown" if drawn else "hidden", Input.mouse_mode, mp,
+			scene.scene_file_path.get_file() if scene else "-"]
+	var now := Time.get_ticks_msec() / 1000.0
+	if state != _cursor_log_state or (not drawn and mp != "-" and now - _cursor_log_time > 10.0):
+		_cursor_log_state = state
+		_cursor_log_time = now
+		print("[buckdroid] trackpad cursor " + state)
