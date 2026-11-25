@@ -354,3 +354,4 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   each write their 32-bit atlas region. 16-bit atlas: load 540 -> 353 (-34%), GPU ~640 -> 485 MHz, table view
   identical (0.08% of pixels). Single player: no load difference (cached shadows, 282 vs 277) and the dealer's face
   was the reason for 32 bits on 4.1, so *choice*: 16-bit atlas only in the multiplayer match (BuckdroidRender #7).
+- 2026-11-25 unplugged multiplayer run with the 16-bit match atlas, started cool (~33 C), 11 min: 59.2 fps (88% at 60, lowest 5 s 45), headroom 0.62 -> 0.82 at 6 min -> 0.86 at 10 min, max 0.88, thermal status max 1 (the run before the change: 0.90 at 10 min, max 0.91, status 2). Heat guard did not need to act.
