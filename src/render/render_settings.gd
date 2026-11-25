@@ -44,6 +44,12 @@
 ##    room's geometry gets visual layer ROOM_LAYER_BIT (cameras and lights include every layer, so it stays visible and
 ##    lit) and the table lights leave it out of their shadow_caster_mask. About a third fewer shadow triangles.
 ##
+## 6. Shadows nobody can see (every platform). In the multiplayer scene one of the club's two flashing overhead lights
+##    ("light_interior club upper light hit1") has a shadow that changes nothing on screen: frozen frames from four
+##    directions are identical with and without it (the other overhead light and the room light change 13-97% of the
+##    picture, so theirs stay). Its shadow is turned off; the light itself still shines and flashes. Saves its shadow
+##    map and, more importantly on phones, the soft shadow lookups for that light on every pixel it lights.
+##
 ## Phase 5 turns this into the Low / Medium / High presets.
 extends Node
 
@@ -51,6 +57,7 @@ const KEY_LIGHT_ENERGY := 15.0      # omni lights at or above this initial energ
 const ZERO_ENERGY := 0.01
 const ANDROID_DEFAULT_MODE := "mixed"
 const MULTIPLAYER_SCENE_ROOT := "/root/mp_main/"
+const SHADOWLESS_LIGHTS := ["light_interior club upper light hit1"]   # 6
 
 const MODES := ["cube", "mixed", "adaptive", "key_only", "paraboloid"]
 const DEALER_HEAD_NODE := &"dealer head mesh"   # the dealer's head mesh in the game's main scene
@@ -169,6 +176,9 @@ func _is_shadow_excluded(node: Node) -> bool:
 
 func _register(light: Light3D) -> void:
 	if not is_instance_valid(light) or not light.shadow_enabled or _lights.has(light):
+		return
+	if String(light.name) in SHADOWLESS_LIGHTS and String(light.get_path()).begins_with(MULTIPLAYER_SCENE_ROOT):
+		light.shadow_enabled = false     # 6 (see header); not tracked, so nothing switches it back on
 		return
 	_lights.append(light)
 	# Key lights (cube shadows in "mixed") exist to keep the dealer's face as on the PC. The multiplayer table has no

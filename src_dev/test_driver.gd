@@ -160,6 +160,16 @@ func _run() -> void:
 					t.pressed = false
 					Input.parse_input_event(t)
 				_log("twofinger %s %s done" % [p[1], p[2]])
+			"lightmask":  # lightmask <light name prefix> <on|off>: whether those lights light visual layer 20 (light_cull_mask)
+				var lmp := p[1].replace("+", " ")
+				var nl := 0
+				for l in get_tree().current_scene.find_children(lmp + "*", "Light3D", true, false):
+					if p[2] == "off":
+						l.light_cull_mask &= ~(1 << 19)
+					else:
+						l.light_cull_mask |= (1 << 19)
+					nl += 1
+				_log("lightmask %s %s (%d lights)" % [lmp, p[2], nl])
 			"inputmap":  # inputmap <action, + for spaces>: the events bound to an action
 				var an := p[1].replace("+", " ")
 				if InputMap.has_action(an):
