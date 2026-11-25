@@ -170,6 +170,24 @@ func _run() -> void:
 						l.light_cull_mask |= (1 << 19)
 					nl += 1
 				_log("lightmask %s %s (%d lights)" % [lmp, p[2], nl])
+			"clipspaced":  # clipspaced <file>: put the saved lobby ID on the clipboard with spaces, then send the "back from another
+				# app" notification (tests the clipboard clean-up for the game's paste button)
+				var lid_text := FileAccess.get_file_as_string(p[1]).strip_edges()
+				var spaced := ""
+				for k in range(0, lid_text.length(), 3):
+					spaced += lid_text.substr(k, 3) + " "
+				DisplayServer.clipboard_set(spaced.strip_edges())
+				var bootn := get_node_or_null(^"/root/BuckdroidBoot")
+				if bootn:
+					bootn.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
+				_log("clipboard was '%s', now '%s'" % [spaced.strip_edges(), DisplayServer.clipboard_get()])
+			"typelobby":  # typelobby <file>: type the saved lobby ID (with spaces) into the lobby screen's entry box and join
+				var raw2 := FileAccess.get_file_as_string(p[1]).strip_edges()
+				var bootn2 := get_node_or_null(^"/root/BuckdroidBoot")
+				bootn2._open_entry()
+				bootn2._entry.text = raw2.substr(0, 9) + " " + raw2.substr(9)
+				bootn2._join_typed()
+				_log("typed '%s', note '%s'" % [bootn2._entry.text, bootn2._entry_note.text])
 			"inputmap":  # inputmap <action, + for spaces>: the events bound to an action
 				var an := p[1].replace("+", " ")
 				if InputMap.has_action(an):

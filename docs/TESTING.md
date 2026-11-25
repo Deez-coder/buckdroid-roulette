@@ -16,8 +16,9 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 4. Tap Play. You can delete the .exe afterwards.
 
 ## Multiplayer
-- One player hosts a table (Multiplayer), copies the lobby ID (also shown at the top right) and sends it to the
-  others, who join with the game's "join with pasted ID". Everyone needs the same test build.
+- One player hosts a table (Multiplayer). The 18-digit lobby ID is shown at the top right ("Copy lobby ID" copies
+  it). The others join with the game's "join with pasted ID", or tap "TYPE A LOBBY ID" and type it. Spaces don't
+  matter either way. Everyone needs the same test build.
 - Same Wi-Fi works best; over mobile data most networks work, some strict ones do not (the app says so).
 - Look around: two fingers (one finger on an empty spot in Buttons mode, or a controller's left trigger + stick).
 - Players in a lobby can see each other's internet address, as in any peer-to-peer game.

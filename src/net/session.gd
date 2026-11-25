@@ -197,11 +197,11 @@ func create_lobby(limit: int) -> void:
 
 
 static func _new_lobby_id() -> int:
-	# 16 digits (about 53 bits): the room code for internet play, so it must not be guessable. Shared by copy and paste
-	# (the game's own "copy lobby ID" and "join with pasted ID").
+	# 18 digits (about 59 bits): the room code for internet play, so it must not be guessable. Exactly 18 because the
+	# game's "join with pasted ID" only accepts 18 characters (the length of a Steam lobby ID).
 	var c := Crypto.new()
 	var b := c.generate_random_bytes(8)
-	return 1000000000000000 + absi(b.decode_s64(0)) % 9000000000000000
+	return 100000000000000000 + absi(b.decode_s64(0)) % 900000000000000000
 
 
 func join_lobby(id: int) -> void:
