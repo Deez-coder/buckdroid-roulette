@@ -294,3 +294,14 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   reached). Phone-side A/B in a match (test driver on the phone): GPU 14.0 ms as is; shadow atlas 2048 12.6 ms (-10%,
   no hitch, shots look the same); soft shadow quality 1 10.6 ms (-24%, shots look the same, but changing it at run
   time recompiles shaders: 3.5 s freeze); 3D scale 0.85 / 0.75: -3% / -6%; all shadows off 11.0 ms.
+- 2026-11-25, look-around on touch (user request). The game's free look: hold "free look toggle" (right mouse button,
+  or a controller's left trigger, axis 4), then mouse motion or the left stick turns the camera (MP_UserCameraLook);
+  on release the camera eases back. BuckdroidTouch: two fingers send the action and one mouse-motion event per frame
+  from their average movement (look_speed, default 1.0); a tap the first finger had not delivered yet is dropped.
+  TouchPad (Buttons mode): a finger on an empty spot = left trigger + floating left stick. Checked on the PC with a
+  simulated two-finger drag mid-match (camera turned, then returned).
+- Heat recon options (phone numbers above): the remaining GPU load is mostly lighting with soft shadow filtering, not
+  pixel count (3D scale 0.75 saves only 6%). Invisible-in-screenshots savings: shadow atlas 2048 (-10%) and soft
+  shadow quality 1 (-24%, must be set at start: switching mid-game recompiles shaders). Frame-rate caps cut GPU work
+  roughly in proportion. Proposed: heat guard steps shadow resolution first, then frame rate, resolution last;
+  optional "cooler shadows" setting (soft 1 + atlas 2048).
