@@ -103,6 +103,11 @@ public class LauncherActivity extends KitActivity {
         return gamePck.exists() && s != null && "done".equals(s.optString("state"));
     }
 
+    /* Switches that show or hide other settings redraw the page. */
+    @Override protected void onToggle(Ini ini, String key, boolean checked) {
+        if ("thermal_guard".equals(key)) ui.post(() -> show(tab));
+    }
+
     static boolean converting() { Converter c = Converter.current; return c != null && "running".equals(c.state); }
 
     /* Whether the converted game carries this app version's scripts (Converter.payloadHash). */
@@ -280,6 +285,9 @@ public class LauncherActivity extends KitActivity {
                 "30 fps runs much cooler and saves battery."));
         perf.addView(toggle(g, "thermal_guard", "Heat guard", "on", "off", "on",
                 "When the phone is about to throttle, lowers the 3D resolution a step until it cools down."));
+        if (!"off".equalsIgnoreCase(g.get("thermal_guard", "on")))
+            perf.addView(slider(g, "thermal_guard_level", "Heat guard steps in at", 80, 99, 1, 90, "%", 0.01f,
+                    "How warm the phone may get first (Android's thermal headroom). Lower: steps in earlier, stays cooler."));
         perf.addView(toggle(g, "fps_counter", "Performance overlay", "on", "off", "off",
                 "Frame rate, frame time, memory and heat in the top left corner."));
         content.addView(perf);
