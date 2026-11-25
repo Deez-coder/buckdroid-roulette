@@ -1,0 +1,33 @@
+From afa06e9664b29cf5dcd450175d5fc4290e75761e Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Wed, 25 Nov 2026 17:27:02 +0300
+Subject: [PATCH] Buckdroid: shadow-update budget interval read at run time
+ (changeable while the game runs)
+
+---
+ servers/rendering/renderer_scene_cull.cpp | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/servers/rendering/renderer_scene_cull.cpp b/servers/rendering/renderer_scene_cull.cpp
+index 8b1ac58..c1e09a0 100644
+--- a/servers/rendering/renderer_scene_cull.cpp
++++ b/servers/rendering/renderer_scene_cull.cpp
+@@ -3481,12 +3481,9 @@ void RendererSceneCull::_render_scene(const RendererSceneRender::CameraData *p_c
+ 			// lights, .../buckdroid_cube_update_interval for cube lights; 1 = every frame, Godot's behaviour). The change
+ 			// stays pending and is drawn on a later frame, so nothing is lost; at 60 fps a moving shadow trails by at
+ 			// most (N - 1) frames.
+-			static int bd_parab_interval = -1;
+-			static int bd_cube_interval = -1;
+-			if (bd_parab_interval < 0) {
+-				bd_parab_interval = MAX(1, (int)GLOBAL_GET("rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval"));
+-				bd_cube_interval = MAX(1, (int)GLOBAL_GET("rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval"));
+-			}
++			// Read every frame (not cached), so the game can change it while running (the heat guard does).
++			int bd_parab_interval = MAX(1, (int)GLOBAL_GET_CACHED(int, "rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval"));
++			int bd_cube_interval = MAX(1, (int)GLOBAL_GET_CACHED(int, "rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval"));
+ 			uint64_t bd_frame = Engine::get_singleton()->get_frames_drawn();
+ 			bool bd_deferred = false;
+ 			if (light->is_shadow_dirty() && RSG::light_storage->light_get_type(ins->base) == RS::LIGHT_OMNI) {
+-- 
+2.53.0.windows.2
+

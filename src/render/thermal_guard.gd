@@ -6,9 +6,12 @@ extends Node
 ## close to throttling, the approach Google recommends for games (ADPF). Normal play is untouched.
 ##
 ## Steps, cheapest-looking first (measured on a Galaxy S24 Ultra in a multiplayer match, GPU 14.0 ms per frame):
-##   1. shadow resolution halved (12.6 ms, -10%; screenshots look the same; no hitch),
-##   2. frame rate limit 50, 3. frame rate limit 40 (work falls with the frame rate),
-##   4+. 3D resolution down in 10% steps to 70% (only -3% per step on that phone: the load is lighting, not pixels).
+##   1. shadow resolution halved (-10%; screenshots look the same; no hitch),
+##   2. moving shadows redrawn every 2nd frame instead of every frame (the shadow-update budget, engine patch 46-0001,
+##      read at run time since 46-0015): in a multiplayer match most of the GPU load is shadow redraws, because the
+##      players always move; a moving shadow then trails by one frame,
+##   3. frame rate limit 50, 4. frame rate limit 40 (work falls with the frame rate),
+##   5+. 3D resolution down in 10% steps to 70%.
 ## One step down per check (10 s) while hot, one step back up per minute once cooled. Steps that would not lower
 ## anything (the player already chose lower values) are skipped.
 ##
@@ -38,7 +41,10 @@ var _cool_time := 0.0
 var _user_scale := 1.0
 var _base_atlas := 0
 var _base_fps := 0
+var _base_refresh := 1
 const FPS_STEPS := [50, 40]
+const REFRESH_KEYS := ["rendering/lights_and_shadows/positional_shadow/buckdroid_paraboloid_update_interval",
+		"rendering/lights_and_shadows/positional_shadow/buckdroid_cube_update_interval"]
 
 
 func _ready() -> void:
@@ -70,11 +76,12 @@ func _ready() -> void:
 func _capture_base() -> void:
 	_base_atlas = get_tree().root.positional_shadow_atlas_size
 	_base_fps = Engine.max_fps
+	_base_refresh = int(ProjectSettings.get_setting(REFRESH_KEYS[0], 1))
 
 
 func _max_steps() -> int:
 	var scale_steps := int(round((_user_scale - MIN_SCALE) / STEP))
-	return 1 + FPS_STEPS.size() + maxi(scale_steps, 0)
+	return 2 + FPS_STEPS.size() + maxi(scale_steps, 0)
 
 
 func _process(delta: float) -> void:
@@ -115,21 +122,26 @@ func _apply(reason: String) -> void:
 	var atlas := _base_atlas / 2 if eased_steps >= 1 and _base_atlas >= 2048 else _base_atlas
 	if root.positional_shadow_atlas_size != atlas:
 		root.positional_shadow_atlas_size = atlas
-	# 2, 3: frame rate limit (never above the player's own limit; 0 = unlimited)
+	# 2: moving shadows every 2nd frame (never more often than the player's own shadow_refresh setting)
+	var refresh := maxi(_base_refresh, 2) if eased_steps >= 2 else _base_refresh
+	for key in REFRESH_KEYS:
+		if int(ProjectSettings.get_setting(key, 1)) != refresh:
+			ProjectSettings.set_setting(key, refresh)
+	# 3, 4: frame rate limit (never above the player's own limit; 0 = unlimited)
 	var fps := _base_fps
-	var fps_step := eased_steps - 1
+	var fps_step := eased_steps - 2
 	if fps_step >= 1:
 		var cap: int = FPS_STEPS[mini(fps_step, FPS_STEPS.size()) - 1]
 		fps = cap if _base_fps == 0 else mini(_base_fps, cap)
 	Engine.max_fps = fps
 	# 4+: 3D resolution
-	var scale_steps := maxi(0, eased_steps - 1 - FPS_STEPS.size())
+	var scale_steps := maxi(0, eased_steps - 2 - FPS_STEPS.size())
 	var scale := maxf(MIN_SCALE, _user_scale - scale_steps * STEP)
 	if not is_equal_approx(root.scaling_3d_scale, scale):
 		root.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 		root.scaling_3d_scale = scale
-	print("[buckdroid] thermal guard: step %d - shadow atlas %d, fps limit %d, 3D scale %.2f (%s)" % [eased_steps, atlas,
-			fps, scale, reason])
+	print("[buckdroid] thermal guard: step %d - shadow atlas %d, shadows every %d frame(s), fps limit %d, 3D scale %.2f (%s)" % [
+			eased_steps, atlas, refresh, fps, scale, reason])
 
 
 ## Tests (the dev test driver: "call BuckdroidThermal force_step <n>"): apply step n as if the phone were that hot.
