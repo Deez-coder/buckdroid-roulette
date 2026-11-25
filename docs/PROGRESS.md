@@ -413,3 +413,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
 - 2026-11-25 trackpad cursor: in multiplayer it followed a leftover single-player CursorManager (always hidden); now it
   follows the game's mouse mode there. Trackpad moves carry a speed so the game's controller code switches back to the
   mouse. Tested on the PC (match and lobby) and with a scripted phone run (lobby).
+- 2026-11-25 end of day: all three touch modes (Tap, Trackpad, Buttons) tested by the user in a phone-vs-PC match on the
+  1.0.0 release build; chat, item selection and the trackpad cursor work. Pushed. Likely cause of the repeated "trackpad
+  cursor gone" reports right after installs: the game reopened from recent apps runs before the launcher's script
+  update (Play) and still had the old scripts. Next: a startup check in the game activity that sends the player to the
+  launcher when the scripts are out of date (user: later).

@@ -1,4 +1,4 @@
-# Testing Buckdroid Roulette (test build 2026-11-25)
+# Testing Buckdroid Roulette (1.0.0, 2026-11-25)
 
 For people trying the app. It contains no part of Buckshot Roulette: you need your own copy from Steam.
 
@@ -14,6 +14,8 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 3. Open Buckdroid Roulette, tap "Pick Buckshot Roulette.exe" and choose the file. Setup takes a couple of minutes;
    everything stays on the phone.
 4. Tap Play. You can delete the .exe afterwards.
+5. **After installing a newer version, start the game with Play in the launcher** (not from the recent-apps screen):
+   the first Play updates the game's scripts.
 
 ## Multiplayer
 - One player hosts a table (Multiplayer). The 18-digit lobby ID is shown at the top right ("Copy lobby ID" copies
@@ -23,7 +25,8 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 - Look around: two fingers (one finger on an empty spot in Buttons mode, or a controller's left trigger + stick).
 - Players in a lobby can see each other's internet address, as in any peer-to-peer game.
 - Chat: tap CHAT (top right, in the lobby and during a match). New messages show briefly under the button while the
-  box is closed. Chat can be turned off in the launcher (Game tab, Multiplayer).
+  box is closed; drag the message list to scroll; Enter or the keyboard's Send key sends. Chat can be turned off in the
+  launcher (Game tab, Multiplayer).
 - The lobby buttons, the lobby ID box and the chat work in every control mode, Buttons mode included.
 - The performance overlay (Graphics: FPS counter) shows the ping while in a lobby.
 
@@ -31,9 +34,10 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 - The phone gets warmer in multiplayer than in single player; the heat guard eases graphics when it gets hot.
   "Cooler shadows" (Graphics) runs cooler with almost no visible difference.
 - The screen can still switch to 120 Hz briefly while touching (some phones).
-- This is a debug build. Later test builds install over it; a future release build may need an uninstall first
-  (settings and the converted game would then need setting up again).
+- In the multiplayer lobby the cursor is hidden for a few seconds while the lobby's intro plays (as on PC).
 
 ## Reporting problems
-Say what phone you have, what you did, and what happened. Graphics -> Advanced -> "Performance log" writes performance and
-heat logs to the app's folder (Android/data/com.buckdroid.roulette/files/telemetry) if asked for them.
+Say what phone you have, what you did, and what happened, and send the logs: launcher -> About -> Report a problem ->
+**Export logs** saves a zip to Downloads and opens the share menu. It holds the game's logs, the settings and the phone
+model, no game files or passwords (it does include your multiplayer name, player ID and lobby IDs).
+Graphics -> Advanced -> "Performance log" adds performance and heat logs if asked for them.
