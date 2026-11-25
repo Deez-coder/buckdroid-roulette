@@ -338,3 +338,13 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   surfaces facing away from the light (N.L <= 0 means that light adds nothing there), except for materials whose
   lighting reaches back faces (wrap/toon diffuse, toon specular, backlight, transmittance, rim, clearcoat, custom
   light()) and lights with a size. Patch 46-0013 (pending build and phone measurement).
+- 2026-11-25, GPU split on the phone in a match, measured as GPU load = clock x busy (the earlier ms numbers hid
+  savings because the GPU clocks down when work is removed). Base 527-531 (629 MHz). 3D scale 50%: 381 (-28%).
+  Shadow atlas 2048: 474 (-10%). All shadows off: 157 (-70%, 231 MHz). Lights at zero energy: no change. Five table
+  fill lights' shadows off: 211 (-60%). Room light + overhead light shadows off: 470 (-11%). Soft shadow quality 1:
+  483 (-9%). Animations frozen: 491 (-8%; the players' scripted sway still moves). So the heat is the five table fill
+  lights' shadow maps being redrawn every frame (10 dual-paraboloid passes over players, table and items), not the
+  per-pixel sampling.
+- Patches 46-0013 (back-facing omni shadow lookups skipped) and 46-0014 (Android: unchanged custom cursor updates
+  skipped; the game set its cursor every frame, which did Java asset lookups each time, ~4% of the game thread):
+  installed; no measurable change in GPU clock; game thread ~101% of a core over 10 s.
