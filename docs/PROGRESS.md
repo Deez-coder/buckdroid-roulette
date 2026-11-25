@@ -323,3 +323,18 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   display stays at 60 Hz while touching.
 - 2026-11-25: refresh rate during a multiplayer match after patch 46-0012, 3 min over USB while the user played by touch: 31 of 36 samples at 60 Hz, 5 at 120 Hz (before: 20-25 of 37 at 60 Hz). Better, not fully gone.
 - 2026-11-25 match 3 (latest build, phone on USB charging for the refresh log, 6 min): 58.4 fps, 84% at 60, lowest 5 s average 43, GPU 14.5 ms; headroom 0.63 -> 0.92 in 6 min (charging adds heat); the heat guard took step 1 at 0.91 (shadow atlas 2048) as designed. Occlusion culling considered (user question): Godot already frustum-culls; visible draws are ~150 and occlusion culling does not apply to shadow passes, so little to gain.
+
+## Heat cause (2026-11-25, measured on the phone in a multiplayer match)
+- GPU at 629-680 MHz, ~83% busy (single player at 60 fps: 366 MHz, its lowest step, ~75% busy). Power rises steeply
+  with clock and voltage, so the match's roughly doubled GPU work per frame shows up as heat.
+- CPU: VkThread (Godot's game loop and render recording) about one full core; AudioTrack 10%; our networking < 1%.
+  simpleperf (per-app, debuggable build): VkThread time split ~50% Godot, ~21% Adreno driver, ~11% libc; some zip
+  central-directory lookups (libandroid_runtime) every frame - to be identified once the engine has symbols.
+- Recon (Arm's 2025 Godot mobile posts, Android/The Forge Godot Vulkan story, Qualcomm guides): render-pass and
+  shader fixes (load/store ops, specialization constants, low-attenuation light skip, FP16) are already in 4.6; Arm
+  lists soft shadows for all lights and directional shadows as still "not optimal for mobile" - matching our A/B where
+  soft shadow filtering is the largest single GPU cost.
+- Engine fix (*choice*, every platform, picture identical by construction): omni shadow lookups are skipped for
+  surfaces facing away from the light (N.L <= 0 means that light adds nothing there), except for materials whose
+  lighting reaches back faces (wrap/toon diffuse, toon specular, backlight, transmittance, rim, clearcoat, custom
+  light()) and lights with a size. Patch 46-0013 (pending build and phone measurement).
