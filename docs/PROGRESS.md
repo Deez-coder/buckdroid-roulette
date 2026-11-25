@@ -322,3 +322,4 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   .work/buckdroid.apk (launcher quick-updates the scripts), a multiplayer heat run, and a SurfaceFlinger check that the
   display stays at 60 Hz while touching.
 - 2026-11-25: refresh rate during a multiplayer match after patch 46-0012, 3 min over USB while the user played by touch: 31 of 36 samples at 60 Hz, 5 at 120 Hz (before: 20-25 of 37 at 60 Hz). Better, not fully gone.
+- 2026-11-25 match 3 (latest build, phone on USB charging for the refresh log, 6 min): 58.4 fps, 84% at 60, lowest 5 s average 43, GPU 14.5 ms; headroom 0.63 -> 0.92 in 6 min (charging adds heat); the heat guard took step 1 at 0.91 (shadow atlas 2048) as designed. Occlusion culling considered (user question): Godot already frustum-culls; visible draws are ~150 and occlusion culling does not apply to shadow passes, so little to gain.
