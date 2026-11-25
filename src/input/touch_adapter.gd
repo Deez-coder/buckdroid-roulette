@@ -195,7 +195,13 @@ func _input_relative(event: InputEvent) -> void:
 		_rel_moved += event.relative.length()
 		var size := get_viewport().get_visible_rect().size
 		_cursor = (_cursor + event.relative * cursor_speed).clamp(Vector2.ZERO, size - Vector2.ONE)
-		_move_to(_cursor, event.relative * cursor_speed)
+		# With a speed, like a real mouse: the game's controller code switches back from controller to mouse (and shows
+		# the cursor again) only on mouse movement with a speed; without it the trackpad cursor stayed hidden for good
+		# once anything had put the game in controller mode (tester report: cursor gone in the multiplayer lobby).
+		var v: Vector2 = event.velocity * cursor_speed
+		if v == Vector2.ZERO:
+			v = event.relative * cursor_speed * 60.0
+		_move_to(_cursor, event.relative * cursor_speed, v)
 
 
 ## Two fingers: look around (see header). Returns true when the event belongs to a look and must not act as a tap.
@@ -438,7 +444,13 @@ func _build_cursor_overlay() -> void:
 func _update_cursor() -> void:
 	var show := mode == "relative"
 	var state := "point"
-	if show and is_instance_valid(_cursor_manager):
+	var scene := get_tree().current_scene
+	if show and scene and scene.scene_file_path.begins_with("res://multiplayer/"):
+		# Multiplayer: each player's MP_CursorManager shows and hides the cursor through the mouse mode (visible /
+		# hidden); the scene also holds a leftover single-player CursorManager that always says hidden, which made the
+		# trackpad cursor vanish for the whole match (tester report: gone after the intro).
+		show = Input.mouse_mode == Input.MOUSE_MODE_VISIBLE
+	elif show and is_instance_valid(_cursor_manager):
 		var cv = _cursor_manager.get("cursor_visible")
 		if cv != null:
 			show = bool(cv)

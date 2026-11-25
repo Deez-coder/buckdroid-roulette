@@ -828,6 +828,27 @@ func _run() -> void:
 				await get_tree().process_frame
 				chat8._entry.gui_input.disconnect(cb)
 				_log("enter: the field saw %s" % [seen])
+			"cursorinfo":  # cursorinfo [n] [interval]: the trackpad cursor's state, n times
+				var tad := get_node_or_null(^"/root/BuckdroidTouch")
+				var times := int(p[1]) if p.size() > 1 else 1
+				var every := float(p[2]) if p.size() > 2 else 1.0
+				for i in times:
+					var cm = tad._cursor_manager
+					var cmi := "none"
+					if is_instance_valid(cm):
+						cmi = "%s visible=%s" % [cm.get_path(), cm.get("cursor_visible")]
+					var ctl := "none"
+					var bootc := get_node_or_null(^"/root/BuckdroidBoot")
+					var cmn: Node = bootc._find_by_script(get_tree().current_scene, "MP_ControllerManager.gd") if bootc else null
+					if cmn:
+						var mpc = cmn.get("cursor")
+						ctl = "controller_active=%s cursor_visible=%s" % [mpc.get("controller_active") if mpc else "?", mpc.get("cursor_visible") if mpc else "?"]
+					var gv := get_node_or_null(^"/root/GlobalVariables")
+					_log("cursorinfo: mode %s, drawn %s at %s, manager %s, mouse_mode %d | mp %s, controllerEnabled %s, joypads %s, layer %s scene %s" % [tad.mode, tad._cursor_rect.visible,
+							tad._cursor, cmi, Input.mouse_mode, ctl, gv.get("controllerEnabled") if gv else "?", Input.get_connected_joypads(),
+							tad._layer.visible if tad.get("_layer") else "?", get_tree().current_scene.scene_file_path if get_tree().current_scene else ""])
+					if i < times - 1:
+						await get_tree().create_timer(every).timeout
 			"mousemove":  # mousemove: one mouse movement with speed (what a touch drag or the pad's look-around sends)
 				var mm := InputEventMouseMotion.new()
 				mm.position = _to_window(Vector2(300, 300))
