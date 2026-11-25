@@ -10,7 +10,7 @@
 ##   graphics.ini   shadow_mode = mixed | cube | paraboloid     fps_cap = 60 | 30 | 0 (unlimited)
 ##   controls.ini   touch_mode = direct | relative   cursor_speed = 1.00 (0.25 - 4)   cursor_size = 1.00 (0.5 - 3)
 ##   graphics.ini   fps_counter = off | on (performance overlay)
-##   multiplayer.ini   nickname = <text, up to 24 characters; case kept>   chat = on | off
+##   multiplayer.ini   nickname = <text, up to 24 characters; case kept>   chat = on | off   read_backlog = on | off
 ##
 ## Read once at start; touch settings are read again when controls.ini changes (checked about once a second), so
 ## the launcher's in-game menu can change them live later.
@@ -21,7 +21,7 @@ signal controls_changed
 const DEFAULTS := {
 	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": "", "thermal_guard": "", "thermal_guard_level": ""},   # "" = let BuckdroidRender pick the platform default
 	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00", "tap_assist": "off", "look_speed": "1.00"},
-	"multiplayer": {"nickname": "", "chat": "on"},   # nickname "" = "Player" and 4 digits of the player ID
+	"multiplayer": {"nickname": "", "chat": "on", "read_backlog": "on"},   # nickname "" = "Player" and 4 digits of the player ID
 }
 
 var config_dir := "user://config"
@@ -125,6 +125,8 @@ telemetry = off
 nickname =
 ; In-game chat in multiplayer: on or off.
 chat = on
+; Hand the game every waiting network packet each frame (on), or one per frame as the game does by itself (off).
+read_backlog = on
 """,
 	"controls": """; Buckdroid Roulette - touch settings. A missing key means the default.
 ; direct = tap where you want to click; relative = drag to move a cursor like a trackpad, tap to click;

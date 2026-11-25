@@ -25,6 +25,7 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 - Chat: tap CHAT (top right, in the lobby and during a match). New messages show briefly under the button while the
   box is closed. Chat can be turned off in the launcher (Game tab, Multiplayer).
 - The lobby buttons, the lobby ID box and the chat work in every control mode, Buttons mode included.
+- The performance overlay (Graphics: FPS counter) shows the ping while in a lobby.
 
 ## Known issues
 - The phone gets warmer in multiplayer than in single player; the heat guard eases graphics when it gets hot.

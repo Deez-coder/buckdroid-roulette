@@ -68,6 +68,19 @@ var members: Array = []           # [{id, name}] in join order, host first
 var lobby_data := {}
 var game_version := ""
 
+# --- latency ------------------------------------------------------------------------------------------------------
+# The game reads one packet per frame (MP_PacketManager._process). When an action sends several at once they would
+# wait a frame each (16 ms at 60 fps, 25 ms at 40); with read_backlog on, the rest are handed to the game's own
+# read_p2p_packet() later in the same frame, up to its PACKET_READ_LIMIT (the game's own read-everything routine uses
+# the same limit). On Android the low-latency Wi-Fi mode is held while in a lobby (NetLatency.java).
+const _AfterGame := preload("res://buckdroid/net/after_game.gd")
+var _read_backlog := true
+var _packet_manager: Node
+var _wifi = null
+var _wifi_on := false
+var queue_packets := 0           # game packets read so far, and how many frames they waited in _inbox (latency stats)
+var queue_waited_frames := 0
+var queue_max_wait := 0
 var _inbox: Array = []            # [[sender_id, PackedByteArray]] game packets for readP2PPacket
 var _peers := {}                  # host: peer key -> Peer;   member: one entry, key 0 (the host)
 var _server: TCPServer
@@ -104,11 +117,23 @@ class Peer:
 	var window_packets := 0
 	var window_bytes := 0
 	var started := 0.0
+	var rtt := -1.0               # round trip in ms, smoothed (heartbeat ping/pong); -1 = not measured yet
 
 
 func _ready() -> void:
 	available = ClassDB.class_exists("WebRTCPeerConnection") and ClassDB.can_instantiate("WebRTCPeerConnection")
 	_load_identity()
+	# Latency: receive before any game script runs this frame, so a packet that arrived is read in the same frame.
+	process_priority = -1000
+	var settings := get_node_or_null(^"/root/BuckdroidSettings")
+	_read_backlog = settings == null or settings.get_value("multiplayer", "read_backlog") != "off"
+	var late := Node.new()
+	late.name = "AfterGame"
+	late.process_priority = 1000
+	late.set_script(_AfterGame)
+	add_child(late)
+	if OS.get_name() == "Android" and ClassDB.class_exists("JavaClassWrapper"):
+		_wifi = JavaClassWrapper.wrap("com.buckdroid.roulette.NetLatency")
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bd-net-host="):
 			_direct_host = arg.trim_prefix("--bd-net-host=")
@@ -319,7 +344,53 @@ func read_packet() -> Dictionary:
 	if _inbox.is_empty():
 		return {}
 	var item = _inbox.pop_front()
+	var waited: int = Engine.get_process_frames() - int(item[2]) if item.size() > 2 else 0
+	queue_packets += 1
+	queue_waited_frames += waited
+	queue_max_wait = maxi(queue_max_wait, waited)
 	return {"data": item[1], "steam_id_remote": item[0], "size": item[1].size()}
+
+
+## Round trip to the other players in ms (the slowest connection), -1 when not measured yet.
+func ping_ms() -> int:
+	var worst := -1.0
+	for p in _peers.values():
+		if p.open and p.rtt >= 0.0:
+			worst = maxf(worst, p.rtt)
+	return int(round(worst))
+
+
+## Called by the AfterGame child once the game's scripts have run this frame.
+func _after_game() -> void:
+	var want := lobby_id != 0
+	if _wifi != null and want != _wifi_on:
+		_wifi_on = want
+		print("[buckdroid] low-latency Wi-Fi: %s" % _wifi.setActive(want))
+	if not _read_backlog or _inbox.is_empty():
+		return
+	if _packet_manager == null or not is_instance_valid(_packet_manager) or not _packet_manager.is_inside_tree():
+		_packet_manager = _find_script_node(get_tree().current_scene, "MP_PacketManager.gd")
+		if _packet_manager == null:
+			return
+	var gs := get_node_or_null(^"/root/GlobalSteam")
+	var limit: int = clampi(int(gs.get("PACKET_READ_LIMIT")) if gs and gs.get("PACKET_READ_LIMIT") != null else 32, 1, 64)
+	var n := 1                          # the game already read one this frame
+	while not _inbox.is_empty() and n < limit and lobby_id != 0:
+		_packet_manager.read_p2p_packet()
+		n += 1
+
+
+static func _find_script_node(n: Node, file: String) -> Node:
+	if n == null:
+		return null
+	var sc: Script = n.get_script()
+	if sc and sc.resource_path.get_file() == file:
+		return n
+	for c in n.get_children():
+		var r := _find_script_node(c, file)
+		if r:
+			return r
+	return null
 
 
 func send_chat(text: String) -> void:
@@ -617,7 +688,7 @@ func _poll_peer(p: Peer) -> void:
 		return
 	if not p.has_meta("hb") or now - float(p.get_meta("hb")) > HEARTBEAT_EVERY:
 		p.set_meta("hb", now)
-		_send_ctl(p, {"t": "ping"})
+		_send_ctl(p, {"t": "ping", "ms": Time.get_ticks_msec()})
 
 
 func _rate_ok(p: Peer, size: int) -> bool:
@@ -654,12 +725,12 @@ func _receive(p: Peer, raw: PackedByteArray) -> void:
 				if sender != p.id:
 					return                  # members can only speak for themselves
 				if target == my_id:
-					_inbox.append([sender, data])
+					_inbox.append([sender, data, Engine.get_process_frames()])
 				else:
 					_send_to_member(target, raw)   # forwarded unchanged: the target sees the real sender
 			else:
 				if _is_member(sender):
-					_inbox.append([sender, data])
+					_inbox.append([sender, data, Engine.get_process_frames()])
 		MSG_CHAT:
 			if raw.size() < 9 or raw.size() > 9 + MAX_CHAT * 4:
 				return
@@ -687,9 +758,13 @@ func _game_packet_ok(data: PackedByteArray) -> bool:
 func _on_ctl(p: Peer, m: Dictionary) -> void:
 	var t := str(m.get("t", ""))
 	if t == "ping":
-		_send_ctl(p, {"t": "pong"})
+		_send_ctl(p, {"t": "pong", "ms": int(m.get("ms", 0))})
 		return
 	if t == "pong":
+		var sent := int(m.get("ms", 0))
+		var r := float(Time.get_ticks_msec() - sent)
+		if sent > 0 and r >= 0.0 and r < 10000.0:
+			p.rtt = r if p.rtt < 0.0 else p.rtt * 0.7 + r * 0.3
 		return
 	if t == "bye":
 		p.set_meta("bye", true)

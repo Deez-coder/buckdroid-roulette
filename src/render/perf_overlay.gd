@@ -70,6 +70,10 @@ func _process(delta: float) -> void:
 		_label.text += "
 heat %.2f  status %d  3D %.0f%%" % [thermal.headroom, thermal.status,
 				get_tree().root.scaling_3d_scale * 100.0]
+	var net := get_node_or_null(^"/root/BuckdroidNet")
+	if net and net.lobby_id != 0:
+		var ping: int = net.ping_ms()
+		_label.text += "\nping %s" % ("%d ms" % ping if ping >= 0 else "-")
 	_frames = 0
 	_worst = 0.0
 	_gpu_total = 0.0

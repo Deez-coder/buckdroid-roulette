@@ -367,3 +367,15 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   on-screen pad passes every tap through on the menu and lobby screens (so the game's paste/join/lobby buttons work) and
   taps on our boxes during a match. Tested with two PC copies over the internet path: lobby and match, both directions,
   unread count and popup; layout checked in screenshots.
+- 2026-11-25 tester report after a real match with a friend abroad ("ran really well", ping good but noticeable; the
+  on-screen buttons did nothing back in the lobby after the match). Lobby: the game gives the first lobby button the
+  controller focus only when a lobby is joined or left; coming back from a match reloads the lobby screen while still
+  in the lobby, so nothing had the focus and the d-pad had nothing to move from (reproduced on the PC). BuckdroidBoot
+  now selects the game's own first lobby button (GetFirstUIFocus) when the controller is in use and nothing has the
+  focus (tested on the PC and the phone). Latency, three fixes on our side (the distance itself stays):
+  1) the game reads one packet per frame; the rest of a burst waited a frame each. With read_backlog (multiplayer.ini,
+  default on) waiting packets go to the game's own read_p2p_packet() later in the same frame, up to its
+  PACKET_READ_LIMIT; 2) BuckdroidNet receives before every game script (process_priority -1000): packets waited 1-2
+  frames before, 0 now (PC match measurement); 3) Android's low-latency Wi-Fi mode while in a lobby (NetLatency.java,
+  WAKE_LOCK permission, engine patch 46-0016; the phone's Wi-Fi otherwise dozes between sparse packets). Ping (heartbeat
+  round trip, smoothed) now shows in the performance overlay while in a lobby.

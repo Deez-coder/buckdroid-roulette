@@ -23,6 +23,7 @@ func _process(_delta: float) -> void:
 		if scene:
 			_on_scene_changed.call_deferred(scene)
 	_update_lobby_code(scene)
+	_check_lobby_focus(scene)
 
 
 # --- lobby ID on the lobby screen: shown as text, typed in, pasted with or without spaces ---------------------------------
@@ -230,16 +231,62 @@ func _join_typed() -> void:
 
 
 func _find_lobby_manager(n: Node) -> Node:
+	return _find_by_script(n, "MP_LobbyManager.gd")
+
+
+func _find_by_script(n: Node, file: String) -> Node:
 	if n == null:
 		return null
 	var sc: Script = n.get_script()
-	if sc and sc.resource_path.get_file() == "MP_LobbyManager.gd":
+	if sc and sc.resource_path.get_file() == file:
 		return n
 	for c in n.get_children():
-		var r := _find_lobby_manager(c)
+		var r := _find_by_script(c, file)
 		if r:
 			return r
 	return null
+
+
+# --- controller / on-screen buttons on the lobby screen after a match ------------------------------------------------
+# (tester report: back in the lobby after a match, the on-screen buttons did nothing.) The game picks the first lobby
+# button for controller navigation only when a lobby is joined or left; coming back from a match reloads the lobby
+# screen while still in the lobby, so nothing has the focus and the d-pad has nothing to move from. The first press
+# then selects the game's own first lobby button (it is used for that press only, so it never presses a button).
+## The game marks the controller as in use on the first press (its MP_ControllerManager) and may take that press for
+## itself, so also check after it: controller in use, nothing focused -> the first lobby button.
+var _controller_manager: Node
+func _check_lobby_focus(scene: Node) -> void:
+	if not _on_lobby_screen or (_panel and _panel.visible) or Engine.get_process_frames() % 6 != 0:
+		return
+	if _controller_manager == null or not is_instance_valid(_controller_manager) or not scene.is_ancestor_of(_controller_manager):
+		_controller_manager = _find_by_script(scene, "MP_ControllerManager.gd")
+		if _controller_manager == null:
+			return
+	var cursor = _controller_manager.get("cursor")
+	if cursor == null or not cursor.get("controller_active") or get_viewport().gui_get_focus_owner() != null:
+		return
+	_focus_first_lobby_button()
+
+
+func _focus_first_lobby_button() -> bool:
+	var ui := _find_by_script(get_tree().current_scene, "MP_LobbyUI.gd")
+	if ui == null or not ui.has_method(&"GetFirstUIFocus"):
+		return false
+	var first = ui.GetFirstUIFocus()
+	if first is Control and first.is_visible_in_tree():
+		first.grab_focus()
+		return true
+	return false
+
+
+func _input(event: InputEvent) -> void:
+	if not _on_lobby_screen or not event.is_pressed() or event.is_echo():
+		return
+	var nav := event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.5) 			or (event is InputEventKey and (event.is_action("ui_up") or event.is_action("ui_down") or event.is_action("ui_left") or event.is_action("ui_right")))
+	if not nav or get_viewport().gui_get_focus_owner() != null or (_panel and _panel.visible):
+		return
+	if _focus_first_lobby_button():
+		get_viewport().set_input_as_handled()
 
 
 func _on_scene_changed(scene: Node) -> void:

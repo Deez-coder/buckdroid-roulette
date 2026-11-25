@@ -73,6 +73,7 @@ public final class TouchPad extends View {
 
     /* Puts the buttons over the game when touch_mode is pad; returns null otherwise. */
     public static TouchPad attach(Activity a) {
+        NetLatency.init(a);   /* the game activity's context for the multiplayer Wi-Fi mode (see NetLatency) */
         File f = new File(new File(a.getExternalFilesDir(null), "config"), "controls.ini");
         TouchPad p = new TouchPad(a, f);
         if (!p.on) return null;

@@ -77,6 +77,11 @@ func _run() -> void:
 			"scene":
 				var s := get_tree().current_scene
 				_log("scene: " + (s.scene_file_path if s else "<none>"))
+			"gotoscene":  # gotoscene <res path>: change scene the way the game does (e.g. back to the lobby after a match)
+				get_tree().change_scene_to_file(p[1])
+			"focus":  # focus: which control has the keyboard/controller focus
+				var fo := get_viewport().gui_get_focus_owner()
+				_log("focus: %s" % (str(fo.get_path()) if fo else "<none>"))
 			"tap":
 				await _touch(_to_window(Vector2(float(p[1]), float(p[2]))))
 			"callscript":  # callscript <script file> <method> [args]: call a game script's method (numbers become ints)
@@ -246,6 +251,10 @@ func _run() -> void:
 					_log("net: lobby %d host %s owner %d members %s | game: LOBBY_ID %s HOST_ID %s MEMBERS %s" % [net.lobby_id,
 							net.is_host, net.owner_id, net.members, gs.LOBBY_ID if gs else "?", gs.HOST_ID if gs else "?",
 							gs.LOBBY_MEMBERS if gs else "?"])
+					_log("net latency: ping %d ms, game packets %d, waited %d frames in total, longest %d frames, waiting now %d" % [
+							net.ping_ms(), net.queue_packets, net.queue_waited_frames, net.queue_max_wait, net._inbox.size()])
+					for pp in net._peers.values():
+						_log("net peer %d open %s rtt %.1f heard %.1f s ago hb %s" % [pp.id, pp.open, pp.rtt, net._now() - pp.last_heard, pp.get_meta("hb", -1.0)])
 			"where":  # where <name substring with _ for spaces>: world positions of matching 3D nodes, and the camera
 				var needle := p[1].replace("_", " ").to_lower()
 				var cam := get_viewport().get_camera_3d()

@@ -106,6 +106,13 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   and lobby screens and on our boxes (TouchPad.setPassThrough / setPassRects).
 - Later: per-player mute.
 
+### Latency
+- The game reads one packet per frame; with multiplayer.ini read_backlog = on (default) the rest of a burst is handed to
+  the game's own read_p2p_packet() in the same frame (up to the game's PACKET_READ_LIMIT). BuckdroidNet receives before
+  the game's scripts run (process_priority -1000), its AfterGame child runs after them (1000).
+- Android: the low-latency Wi-Fi lock (WIFI_MODE_FULL_LOW_LATENCY, API 29+) is held while in a lobby (NetLatency.java).
+- The heartbeat measures the round trip; the performance overlay shows "ping" while in a lobby.
+
 ## Steps
 1. **Spike:** build `webrtc-native` for Android arm64 and Windows, load it from our payload in the converted game, and
    connect the phone to the PC build over a local test (proves the GDExtension loads on 4.6 and the data channel works).
