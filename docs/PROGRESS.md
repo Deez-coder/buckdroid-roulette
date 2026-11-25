@@ -288,3 +288,9 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   input design and phone testing.
 - Waiting for the phone: install .work/buckdroid.apk; the launcher then updates the game's scripts by itself (quick
   update), which brings the multiplayer table optimizations; then a multiplayer heat run.
+- 2026-11-25, multiplayer heat run after the optimizations (11 min, 2 players): 57 fps average (from 48), 78% of the
+  time at 60 (from 11%), GPU 15.9 ms (from 20.4), CPU 19.7 ms (from 28.9); thermal headroom still rises to 0.91 with
+  status 2 (moderate) after about 10 min. Heat guard level made a setting, default 0.90 (was a fixed 0.95, never
+  reached). Phone-side A/B in a match (test driver on the phone): GPU 14.0 ms as is; shadow atlas 2048 12.6 ms (-10%,
+  no hitch, shots look the same); soft shadow quality 1 10.6 ms (-24%, shots look the same, but changing it at run
+  time recompiles shaders: 3.5 s freeze); 3D scale 0.85 / 0.75: -3% / -6%; all shadows off 11.0 ms.
