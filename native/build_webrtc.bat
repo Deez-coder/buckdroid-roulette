@@ -25,6 +25,9 @@ if not exist "%LNK%\sdk" mklink /J "%LNK%\sdk" "%ROOT%\.cache\android\sdk" >nul
 cd /d "%LNK%\src"
 set "ANDROID_HOME=%LNK%\sdk"
 set "ANDROID_NDK_ROOT=%LNK%\sdk\ndk\29.0.14206865"
-python -m SCons platform=android target=template_debug arch=arm64 android_api_level=24 ndk_version=29.0.14206865 cmake_generator=Ninja -j12 || exit /b 1
+rem "build_webrtc.bat android release" builds the library for the release template.
+set "TARGET=template_debug"
+if /i "%2"=="release" set "TARGET=template_release"
+python -m SCons platform=android target=%TARGET% arch=arm64 android_api_level=24 ndk_version=29.0.14206865 cmake_generator=Ninja -j12 || exit /b 1
 if not exist "%ROOT%\launcher\jniLibs\arm64-v8a" mkdir "%ROOT%\launcher\jniLibs\arm64-v8a"
 for /r bin %%F in (libwebrtc_native.android*.so) do copy /y "%%F" "%ROOT%\launcher\jniLibs\arm64-v8a\" >nul

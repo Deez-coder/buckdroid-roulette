@@ -10,7 +10,11 @@ set "ANDROID_HOME=%ROOT%\.cache\android\sdk"
 set "ANDROID_SDK_ROOT=%ROOT%\.cache\android\sdk"
 set "PATH=%JAVA_HOME%\bin;%SCONS_DIR%;%PATH%"
 cd /d "%~dp0godot46"
-python -m SCons platform=android target=template_debug arch=arm64 disable_path_overrides=no swappy=yes debug_symbols=yes -j12 || exit /b 1
+rem "build_android46.bat release" builds the release template (the published app) instead of the debug one.
+set "TARGET=template_debug"
+if /i "%1"=="release" set "TARGET=template_release"
+python -m SCons platform=android target=%TARGET% arch=arm64 disable_path_overrides=no swappy=yes debug_symbols=yes -j12 || exit /b 1
 cd platform\android\java
 rem The app's own ID (not com.godot.game), so it never collides with other Godot games.
-call .\gradlew.bat generateGodotTemplates -Pexport_package_name=com.buckdroid.roulette || exit /b 1
+rem The app's version (shown in the launcher): change both for every release (the code must always go up).
+call .\gradlew.bat generateGodotTemplates -Pexport_package_name=com.buckdroid.roulette -Pexport_version_name=1.0.0 -Pexport_version_code=1 || exit /b 1

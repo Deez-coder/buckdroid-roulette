@@ -9,6 +9,7 @@ Format: each entry says **what**, **where** (our file or setting), and **why**.
 ## Unreleased
 
 ### Launcher
+- **Reset all settings** (About page, with a confirmation): deletes `graphics.ini`, `controls.ini` and `multiplayer.ini`, so every setting is back to its default; the converted game stays. *Why:* user request.
 - **Conversion runs inside the launcher** (`Converter.java`, `native/bdconvert.cpp`), with its progress in place of the Play button. *Why:* the old way opened a separate engine window for it and needed an 800 MB copy of the .exe.
 
 ### Game script patches

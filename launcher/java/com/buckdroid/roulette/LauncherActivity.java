@@ -11,6 +11,7 @@
  */
 package com.buckdroid.roulette;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.os.Handler;
@@ -384,5 +385,26 @@ public class LauncherActivity extends KitActivity {
                 + "The license covers only this project's code, not Buckshot Roulette. Built with the Godot Engine (MIT license).",
                 13, DIM, false));
         content.addView(lic);
+
+        /* User request: one button that puts every setting back to its default. The settings are the ini files in
+         * config/ (a missing file or key means the default), so resetting deletes them. The converted game stays. */
+        LinearLayout r = card();
+        r.addView(header("Reset settings"));
+        r.addView(text("Puts every setting back to its default: graphics, controls, the button layout and multiplayer "
+                + "(name and chat). The game itself stays set up.", 13, DIM, false));
+        r.addView(space(10));
+        Button reset = button("Reset all settings", CARD2);
+        reset.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle("Reset all settings?")
+                .setMessage("Every setting goes back to its default. This cannot be undone.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Reset", (d, w) -> {
+                    for (String f : new String[]{"graphics.ini", "controls.ini", "multiplayer.ini"}) new File(config, f).delete();
+                    toast("All settings are back to their defaults.");
+                    show(tab);
+                })
+                .show());
+        r.addView(reset, fullWidth(48));
+        content.addView(r);
     }
 }

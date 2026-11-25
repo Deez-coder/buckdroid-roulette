@@ -10,7 +10,9 @@ paths into native libraries) and the build stops if any remain.
                          (src/), versions.json and autoloads.json (patches/). This project's own code only
 then zip-aligns and signs it. The APK never contains game content.
 
-    python tools/package_apk.py <out.apk> [--keystore K --ks-pass P]   (default: the local debug key in .cache/android)
+    python tools/package_apk.py <out.apk>                              test build: debug template, local debug key
+    python tools/package_apk.py <out.apk> --release --keystore K       the published app: release template, your own
+                                                                       key (the signing tool asks for its password)
 """
 from __future__ import annotations
 
@@ -30,6 +32,7 @@ import build_converter_pck  # noqa: E402
 
 PACKAGE = "com.buckdroid.roulette"
 TEMPLATE = os.path.join(ROOT, "engine", "godot46", "bin", "android_debug.apk")
+RELEASE_TEMPLATE = os.path.join(ROOT, "engine", "godot46", "bin", "android_release.apk")   # build_android46.bat release
 BUILD_TOOLS = os.path.join(ROOT, ".cache", "android", "android-14")
 
 
@@ -91,10 +94,18 @@ def icons(src: zipfile.ZipFile) -> dict[str, bytes]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--template", default=TEMPLATE)
-    ap.add_argument("--keystore", default=os.path.join(ROOT, ".cache", "android", "debug.keystore"))
-    ap.add_argument("--ks-pass", default="android")
+    ap.add_argument("--release", action="store_true", help="release template; needs --keystore with your own key")
+    ap.add_argument("--template", default=None)
+    ap.add_argument("--keystore", default=None)
     a = ap.parse_args()
+    debug_key = os.path.join(ROOT, ".cache", "android", "debug.keystore")
+    if a.release and a.keystore is None:
+        sys.exit("--release needs --keystore <signing key> (the owner chose to sign releases with the local key in "
+                 ".cache/android/debug.keystore; a copy is kept outside the project)")
+    a.template = a.template or (RELEASE_TEMPLATE if a.release else TEMPLATE)
+    a.keystore = a.keystore or debug_key
+    if not os.path.exists(a.template):
+        sys.exit(f"no template at {a.template}: run engine/build_android46.bat" + (" release" if a.release else ""))
 
     secrets = private_strings()
     files = {"assets/payload/" + p[len("res://payload/"):]: d
@@ -106,6 +117,9 @@ def main() -> None:
             for i in src.infolist():
                 n = i.filename
                 if n.startswith("META-INF/") and n.endswith((".SF", ".RSA", ".MF", ".EC", ".DSA")):
+                    continue
+                # launcher/jniLibs holds the WebRTC library for both template types; keep only this one's.
+                if n.startswith("lib/") and "libwebrtc_native." in n and (".template_debug." if a.release else ".template_release.") in n:
                     continue
                 if n in ("assets/_cl_", "assets/converter.pck") or n.startswith("assets/payload/") or n in files                         or (n.startswith("res/mipmap") and n.endswith(".webp")):
                     continue
@@ -130,7 +144,9 @@ def main() -> None:
         if os.path.exists(a.out):
             os.remove(a.out)
         subprocess.run([os.path.join(jdk, "bin", "java.exe"), "-jar", os.path.join(BUILD_TOOLS, "lib", "apksigner.jar"),
-                        "sign", "--ks", a.keystore, "--ks-pass", "pass:" + a.ks_pass, "--out", a.out, aligned], check=True)
+                        "sign", "--ks", a.keystore]
+                       + (["--ks-pass", "pass:android"] if os.path.samefile(a.keystore, debug_key) else [])
+                       + ["--out", a.out, aligned], check=True)
     print(f"wrote {a.out} ({os.path.getsize(a.out) / 1e6:.1f} MB), payload {len(files)} files, command line {args}")
 
 
