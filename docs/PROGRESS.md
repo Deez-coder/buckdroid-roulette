@@ -321,3 +321,4 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   the picture and stays optional (Cooler shadows) or automatic only when hot (heat guard). Next on the phone: install
   .work/buckdroid.apk (launcher quick-updates the scripts), a multiplayer heat run, and a SurfaceFlinger check that the
   display stays at 60 Hz while touching.
+- 2026-11-25: refresh rate during a multiplayer match after patch 46-0012, 3 min over USB while the user played by touch: 31 of 36 samples at 60 Hz, 5 at 120 Hz (before: 20-25 of 37 at 60 Hz). Better, not fully gone.
