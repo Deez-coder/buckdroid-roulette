@@ -396,3 +396,11 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   _input) hands keys to BuckdroidChat while one of our fields is edited, which edits the field itself. Phone check
   (release engine, Buttons mode, scripted keys): keyboard shown at the tap and still up after typing and two
   Backspaces; only the test's quit hid it.
+- 2026-11-25 tester reports: (1) Buttons mode, after taking the items nothing could be selected and "shotgun" stayed
+  shown: the phone log shows "granting perms" (the player's turn) and 0.3 s later the chat safety net taking the focus
+  back for the chat field (the chat was open). The safety net is removed (the keyboard cause was Backspace=ui_cancel).
+  (2) v1's mouse pointer vanished around the intro: Godot's Android display server never shows a hidden pointer again
+  (cursor_set_shape returns early for the unchanged shape, and checked mouse_mode before updating it); the game's
+  frequent cursor-image calls hid this until engine patch 46-0014 skipped unchanged ones. Engine patch 46-0017 forces
+  the pointer back when the mouse mode leaves hidden/captured. Not reproducible without a real mouse on a phone.
+  (3) user request: Export logs in the launcher (LogExport.java).

@@ -1,0 +1,44 @@
+From 584cf02c5730b8f229ab3d3a24fee63a99f2e4c8 Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Wed, 25 Nov 2026 22:26:14 +0300
+Subject: [PATCH] Buckdroid: Android shows the mouse pointer again after it was
+ hidden
+
+---
+ platform/android/display_server_android.cpp | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/platform/android/display_server_android.cpp b/platform/android/display_server_android.cpp
+index 87c16e8..27edbf1 100644
+--- a/platform/android/display_server_android.cpp
++++ b/platform/android/display_server_android.cpp
+@@ -855,10 +855,15 @@ void DisplayServerAndroid::_mouse_update_mode() {
+ 		return;
+ 	}
+ 
++	MouseMode previous_mouse_mode = mouse_mode;
++	mouse_mode = wanted_mouse_mode;
+ 	if (wanted_mouse_mode == MouseMode::MOUSE_MODE_HIDDEN) {
+ 		OS_Android::get_singleton()->get_godot_java()->get_godot_view()->set_pointer_icon(CURSOR_TYPE_NULL);
+-	} else {
+-		cursor_set_shape(cursor_shape);
++	} else if (previous_mouse_mode == MouseMode::MOUSE_MODE_HIDDEN || previous_mouse_mode == MouseMode::MOUSE_MODE_CAPTURED) {
++		// Buckdroid: put the pointer back after it was hidden. cursor_set_shape() returned early for the unchanged shape
++		// (and checked mouse_mode before it was updated), so a hidden mouse pointer never came back unless the game
++		// happened to set a new cursor image (tester report: the mouse pointer vanished after the multiplayer intro).
++		_cursor_set_shape_helper(cursor_shape, true);
+ 	}
+ 
+ 	if (wanted_mouse_mode == MouseMode::MOUSE_MODE_CAPTURED) {
+@@ -866,8 +871,6 @@ void DisplayServerAndroid::_mouse_update_mode() {
+ 	} else {
+ 		OS_Android::get_singleton()->get_godot_java()->get_godot_view()->release_pointer_capture();
+ 	}
+-
+-	mouse_mode = wanted_mouse_mode;
+ }
+ 
+ void DisplayServerAndroid::mouse_set_mode(MouseMode p_mode) {
+-- 
+2.53.0.windows.2
+

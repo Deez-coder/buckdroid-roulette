@@ -132,33 +132,12 @@ func _process_key_guard() -> void:
 # --- focus: keep the game's controller code off our boxes --------------------------------------------------------------
 # The game's MP_ControllerManager remembers every control that gets the focus (previousFocus) and, while the controller
 # is in use (always the case in Buttons mode, where the on-screen pad is a controller), takes that focus away again on
-# the next mouse movement or click. A movement arrives as soon as the phone starts typing, so in Buttons mode the chat
-# field lost the focus at the first letter and the keyboard closed (tester report; reproduced on the PC). When one of
-# our boxes gets the focus, the game's remembered control is set back to its own last one.
+# the next mouse movement or click (reproduced on the PC), which would end typing in our boxes. When one of our boxes
+# gets the focus, the game's remembered control is set back to its own last one. (The keyboard closing at the first
+# letter had another cause, see "typing". A safety net that took the focus back for the chat field was removed: it
+# stole the focus from the game when the player's turn began, and the on-screen buttons stopped selecting items.)
 var _game_focus: Control
 var _letting_go := false               # our own code is taking the focus off a box (closing, tap elsewhere)
-var _refocus_times: Array[float] = []
-
-
-## Safety net: while the chat is open, its text field loses the focus only through the player (CLOSE, a tap elsewhere).
-## Anything else (some other game code) gets the focus taken back, so typing goes on; logged to find the cause.
-## At most 3 times in 2 seconds, so it can never fight another control in a loop.
-func _on_entry_focus_lost() -> void:
-	if _letting_go or not _panel.visible or not _layer.visible:
-		return
-	var now := Time.get_ticks_msec() / 1000.0
-	_refocus_times = _refocus_times.filter(func(t: float) -> bool: return now - t < 2.0)
-	var taker := get_viewport().gui_get_focus_owner()
-	print("[buckdroid] chat field lost the focus to %s" % (str(taker.get_path()) if taker else "nothing"))
-	if _refocus_times.size() >= 3:
-		return
-	_refocus_times.append(now)
-	_refocus.call_deferred()
-
-
-func _refocus() -> void:
-	if _panel.visible and _layer.visible and not _entry.has_focus():
-		_entry.grab_focus()
 var _controller_managers: Array = []
 var _cm_scene: Node
 
@@ -293,7 +272,6 @@ func _build() -> void:
 	_entry.placeholder_text = "Message"
 	_entry.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_entry.text_submitted.connect(func(_t: String) -> void: _send())
-	_entry.focus_exited.connect(_on_entry_focus_lost)
 	_entry.keep_editing_on_text_submit = true      # Enter sends and the keyboard stays for the next message
 	row.add_child(_entry)
 	var send := Button.new()

@@ -386,6 +386,18 @@ public class LauncherActivity extends KitActivity {
                 13, DIM, false));
         content.addView(lic);
 
+        /* User request: players can send their logs with a bug report (LogExport). */
+        LinearLayout rep = card();
+        rep.addView(header("Report a problem"));
+        rep.addView(text("Saves the game's logs, your settings and your phone's model into one zip file in Downloads, "
+                + "then opens the share menu so you can send it with your report. It contains no game files and no "
+                + "passwords, but it does include your multiplayer name, player ID and lobby IDs.", 13, DIM, false));
+        rep.addView(space(10));
+        Button export = button("Export logs", CARD2);
+        export.setOnClickListener(v -> { toast("Collecting the logs..."); LogExport.run(this); });
+        rep.addView(export, fullWidth(48));
+        content.addView(rep);
+
         /* User request: one button that puts every setting back to its default. The settings are the ini files in
          * config/ (a missing file or key means the default), so resetting deletes them. The converted game stays. */
         LinearLayout r = card();
