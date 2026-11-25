@@ -311,3 +311,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   hook force_step). Launcher "Cooler shadows" switch (Graphics -> Picture): sets shadow softness 1 and shadow detail
   2048 (about -30% GPU in a multiplayer match, screenshots look the same); off by default.
 - 2026-11-25 (user away; *choice*): soft shadow quality 1 in the multiplayer match compared on frozen PC frames (5 views): 8-15% of pixels change by more than 12 levels, and zoomed in the item shadows on the table come out darker with a different pattern: visible, so it stays an option (Cooler shadows), not a default. Overhead light hit1 shadow off: identical frames (built in). Table lights not lighting the room: 9-62% of the picture changes (rejected).
+- 2026-11-25 (*choice*): Android 15+ per-view refresh votes. The remaining 120 Hz bursts while touching (see the 120 Hz
+  notes above: the touch-boost opt-out does not cover view-based voting for target SDK 35+) matter more now that
+  multiplayer is played with two-finger looks and the on-screen pad. FrameRate.java sets
+  View.REQUESTED_FRAME_RATE_CATEGORY_NORMAL on every view of the game window (on create, resume and window focus;
+  engine patch 46-0012). Built, not yet checked on the phone (needs a SurfaceFlinger log while touching).

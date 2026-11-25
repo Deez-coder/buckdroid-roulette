@@ -1,0 +1,42 @@
+From 6bfde7c5969ba57ae31cc260cadbd811b121c90c Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Wed, 25 Nov 2026 14:10:40 +0300
+Subject: [PATCH] Buckdroid: the game window's views prefer the normal (60 Hz)
+ refresh category on Android 15+
+
+---
+ .../app/src/main/java/com/godot/game/GodotApp.java    | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java b/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java
+index 81d405e..4f14ccb 100644
+--- a/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java
++++ b/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java
+@@ -76,6 +76,16 @@ public class GodotApp extends GodotActivity {
+ 		EdgeToEdge.enable(this);
+ 		super.onCreate(savedInstanceState);
+ 		touchPad = com.buckdroid.roulette.TouchPad.attach(this);
++		com.buckdroid.roulette.FrameRate.apply(this);
++	}
++
++	@Override
++	public void onWindowFocusChanged(boolean hasFocus) {
++		super.onWindowFocusChanged(hasFocus);
++		if (hasFocus) {
++			// Buckdroid: views added since (Godot's surface is created after onCreate) also prefer 60 Hz.
++			com.buckdroid.roulette.FrameRate.apply(this);
++		}
+ 	}
+ 
+ 	@Override
+@@ -97,6 +107,7 @@ public class GodotApp extends GodotActivity {
+ 	@Override
+ 	public void onResume() {
+ 		super.onResume();
++		com.buckdroid.roulette.FrameRate.apply(this);
+ 		updateWindowAppearance.run();
+ 	}
+ 
+-- 
+2.53.0.windows.2
+
