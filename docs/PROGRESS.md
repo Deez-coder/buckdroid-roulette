@@ -379,3 +379,13 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   frames before, 0 now (PC match measurement); 3) Android's low-latency Wi-Fi mode while in a lobby (NetLatency.java,
   WAKE_LOCK permission, engine patch 46-0016; the phone's Wi-Fi otherwise dozes between sparse packets). Ping (heartbeat
   round trip, smoothed) now shows in the performance overlay while in a lobby.
+- 2026-11-25 tester report on 1.0.0 (Buttons mode on the S24 Ultra): the keyboard closed at the first letter typed in the
+  chat; the chat could not be scrolled. Cause of the first: MP_ControllerManager stores every newly focused control
+  as previousFocus and, while the controller is active (always in Buttons mode), releases it on the next mouse motion
+  or click; reproduced on the PC (controller press, focus the chat field, one mouse motion -> focus gone). Fix: when
+  one of our boxes gets the focus, the game's previousFocus is set back to its own last control; plus a safety net that
+  takes the focus back while the chat is open (max 3 times in 2 s, logged). Found on the way: the game's input map has
+  no ui_text_submit keys, so Enter never sent; our text fields now handle Enter themselves (also the lobby ID box).
+  Chat list: ScrollContainer, 100 messages, finger drag in Tap/Buttons (overlay touches) and Trackpad (a finger put
+  down on the list), stays where the reader is when new messages arrive. Tested on the PC (lobby and match, two copies);
+  the phone was not connected for a phone run.

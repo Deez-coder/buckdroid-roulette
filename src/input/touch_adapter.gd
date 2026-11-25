@@ -62,6 +62,7 @@ var _release_pending: InputEvent = null
 var _last_pos := Vector2.ZERO
 var _debug := OS.get_cmdline_user_args().has("--bd-touch-debug")
 var _overlay_touch := false       # the finger went down on one of our own boxes (BuckdroidChat.consume_tap)
+var _rel_scroll := false          # trackpad mode: the finger went down on the chat's message list and scrolls it
 
 # relative mode
 var _cursor := Vector2(480, 270)   # game base coordinates
@@ -129,11 +130,18 @@ func _overlay_tap(pos: Vector2) -> bool:
 	return chat != null and chat.consume_tap(pos)
 
 
+func _chat() -> Node:
+	return get_node_or_null(^"/root/BuckdroidChat")
+
+
 func _input_direct(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.index == 0 and (_overlay_touch or (event.pressed and _overlay_tap(event.position))):
 		_overlay_touch = event.pressed
+		if event.pressed:
+			_chat().overlay_drag(event.position, Vector2.ZERO, true)
 		return
 	if event is InputEventScreenDrag and event.index == 0 and _overlay_touch:
+		_chat().overlay_drag(event.position, event.relative, false)   # dragging the chat's message list scrolls it
 		return
 	if event is InputEventScreenTouch and event.index == 0:
 		if event.pressed:
@@ -156,6 +164,18 @@ func _input_direct(event: InputEvent) -> void:
 
 
 func _input_relative(event: InputEvent) -> void:
+	# A finger put down on the open chat's message list scrolls it instead of moving the cursor.
+	var chat := _chat()
+	if event is InputEventScreenTouch and event.index == 0 and event.pressed and chat and chat.on_message_list(event.position):
+		_rel_scroll = true
+		chat.overlay_drag(event.position, Vector2.ZERO, true)
+		return
+	if _rel_scroll and event.index == 0 and (event is InputEventScreenTouch or event is InputEventScreenDrag):
+		if event is InputEventScreenDrag:
+			chat.overlay_drag(event.position, event.relative, false)
+		elif not event.pressed:
+			_rel_scroll = false
+		return
 	if event is InputEventScreenTouch and event.index == 0:
 		if event.pressed:
 			_finger_down = true

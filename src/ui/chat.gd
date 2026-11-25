@@ -18,8 +18,7 @@ extends Node
 const LOBBY_SCENE := "res://multiplayer/scenes/mp_lobby.tscn"
 const MATCH_SCENE := "res://multiplayer/scenes/mp_main.tscn"
 const MENU_SCENES := ["res://scenes/menu.tscn", LOBBY_SCENE]
-const MAX_LINES := 40
-const SHOWN_LINES := 9
+const MAX_LINES := 100
 const SEND_INTERVAL := 1.0
 const POPUP_SECONDS := 4.0
 
@@ -30,6 +29,8 @@ var _layer: CanvasLayer
 var _button: Button
 var _panel: PanelContainer
 var _log: Label
+var _scroll: ScrollContainer          # the message list scrolls (drag it with a finger, or the mouse wheel)
+var _drag_scroll := false             # a finger that went down on the list scrolls it
 var _entry: LineEdit
 var _popup: Label
 var _lines: Array[String] = []
@@ -56,12 +57,91 @@ func _ready() -> void:
 		if w:
 			_pad = w
 	_build()
+	# After the game's own handler (deferred): see _on_focus_changed.
+	get_viewport().gui_focus_changed.connect(_on_focus_changed, CONNECT_DEFERRED)
+
+
+# --- focus: keep the game's controller code off our boxes --------------------------------------------------------------
+# The game's MP_ControllerManager remembers every control that gets the focus (previousFocus) and, while the controller
+# is in use (always the case in Buttons mode, where the on-screen pad is a controller), takes that focus away again on
+# the next mouse movement or click. A movement arrives as soon as the phone starts typing, so in Buttons mode the chat
+# field lost the focus at the first letter and the keyboard closed (tester report; reproduced on the PC). When one of
+# our boxes gets the focus, the game's remembered control is set back to its own last one.
+var _game_focus: Control
+var _letting_go := false               # our own code is taking the focus off a box (closing, tap elsewhere)
+var _refocus_times: Array[float] = []
+
+
+## Safety net: while the chat is open, its text field loses the focus only through the player (CLOSE, a tap elsewhere).
+## Anything else (some other game code) gets the focus taken back, so typing goes on; logged to find the cause.
+## At most 3 times in 2 seconds, so it can never fight another control in a loop.
+func _on_entry_focus_lost() -> void:
+	if _letting_go or not _panel.visible or not _layer.visible:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	_refocus_times = _refocus_times.filter(func(t: float) -> bool: return now - t < 2.0)
+	var taker := get_viewport().gui_get_focus_owner()
+	print("[buckdroid] chat field lost the focus to %s" % (str(taker.get_path()) if taker else "nothing"))
+	if _refocus_times.size() >= 3:
+		return
+	_refocus_times.append(now)
+	_refocus.call_deferred()
+
+
+func _refocus() -> void:
+	if _panel.visible and _layer.visible and not _entry.has_focus():
+		_entry.grab_focus()
+var _controller_managers: Array = []
+var _cm_scene: Node
+
+
+func _on_focus_changed(c: Control) -> void:
+	if c == null or not is_instance_valid(c):
+		return
+	if not _is_overlay(c):
+		_game_focus = c
+		return
+	var scene := get_tree().current_scene
+	if scene != _cm_scene:
+		_cm_scene = scene
+		_controller_managers = []
+		if scene:
+			for n in scene.find_children("*", "Node", true, false):
+				var sc: Script = n.get_script()
+				if sc and sc.resource_path.get_file() == "MP_ControllerManager.gd":
+					_controller_managers.append(n)
+	var keep: Control = _game_focus if is_instance_valid(_game_focus) and _game_focus.is_inside_tree() else null
+	for cm in _controller_managers:
+		if is_instance_valid(cm) and _is_overlay(cm.get("previousFocus")):
+			cm.set("previousFocus", keep)
+
+
+func _is_overlay(c) -> bool:
+	if not (c is Control) or not is_instance_valid(c):
+		return false
+	for o in _overlay:
+		if is_instance_valid(o) and (o == c or o.is_ancestor_of(c)):
+			return true
+	return false
 
 
 # --- overlay taps ----------------------------------------------------------------------------------------------------
 func register(c: Control) -> void:
 	if not _overlay.has(c):
 		_overlay.append(c)
+		if c is LineEdit:
+			c.gui_input.connect(_on_field_key.bind(c))
+
+
+## The game's input map has no keys for "ui_text_submit" (Godot's Enter-in-a-text-field action), so Enter (and the
+## phone keyboard's Send/Done key, which arrives as Enter) never submitted our text fields. Done here for our fields
+## only; the game's own input map stays as it is.
+func _on_field_key(event: InputEvent, field: LineEdit) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		if InputMap.has_action(&"ui_text_submit") and InputMap.event_is_action(event, &"ui_text_submit"):
+			return                      # the engine already handles it
+		field.text_submitted.emit(field.text)
+		field.accept_event()
 
 
 ## A tap at pos (the game's 960x540 coordinates). True when it landed on one of our boxes and was handled here.
@@ -76,7 +156,9 @@ func consume_tap(pos: Vector2) -> bool:
 		hit_any = true
 		if c is LineEdit:
 			if c.has_focus():
+				_letting_go = true
 				c.release_focus()       # focusing again brings the keyboard back after it was closed
+				_letting_go = false
 			c.grab_focus()
 			return true
 		if c is BaseButton and not c.disabled:
@@ -87,7 +169,9 @@ func consume_tap(pos: Vector2) -> bool:
 	# A tap elsewhere ends typing.
 	var focused := get_viewport().gui_get_focus_owner()
 	if focused is LineEdit and _overlay.has(focused):
+		_letting_go = true
 		focused.release_focus()
+		_letting_go = false
 		DisplayServer.virtual_keyboard_hide()
 	return false
 
@@ -124,12 +208,16 @@ func _build() -> void:
 	close.pressed.connect(_toggle)
 	top.add_child(close)
 	box.add_child(top)
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.custom_minimum_size = Vector2(0, 190)
+	box.add_child(_scroll)
 	_log = Label.new()
 	_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_log.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_log.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_log.custom_minimum_size = Vector2(0, 190)
-	_log.clip_text = true
-	box.add_child(_log)
+	_scroll.add_child(_log)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 8)
 	_entry = LineEdit.new()
@@ -137,6 +225,8 @@ func _build() -> void:
 	_entry.placeholder_text = "Message"
 	_entry.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_entry.text_submitted.connect(func(_t: String) -> void: _send())
+	_entry.focus_exited.connect(_on_entry_focus_lost)
+	_entry.keep_editing_on_text_submit = true      # Enter sends and the keyboard stays for the next message
 	row.add_child(_entry)
 	var send := Button.new()
 	send.text = "SEND"
@@ -199,8 +289,8 @@ func _lift_above_keyboard() -> void:
 	if _entry.has_focus() and kb < top + 300 + 8:
 		log_h = clampf(kb - 8 - 110 - 8, 30.0, 190.0)
 		top = maxf(8.0, kb - 8 - (log_h + 110))
-	if _log.custom_minimum_size.y != log_h:
-		_log.custom_minimum_size.y = log_h
+	if _scroll.custom_minimum_size.y != log_h:
+		_scroll.custom_minimum_size.y = log_h
 	_panel.offset_left = -440
 	_panel.offset_right = -20
 	_panel.offset_top = top
@@ -221,9 +311,11 @@ func _toggle() -> void:
 	if _panel.visible:
 		_unread = 0
 		_update_button()
-		_refresh_log()
+		_refresh_log(true)
 	else:
+		_letting_go = true
 		_entry.release_focus()
+		_letting_go = false
 		DisplayServer.virtual_keyboard_hide()
 
 
@@ -259,8 +351,34 @@ func _on_chat(sender_id: int, text: String) -> void:
 		_popup_until = Time.get_ticks_msec() / 1000.0 + POPUP_SECONDS
 
 
-func _refresh_log() -> void:
-	_log.text = "\n".join(_lines.slice(maxi(0, _lines.size() - SHOWN_LINES)))
+func _refresh_log(to_end := false) -> void:
+	# Stay at the newest message unless the player scrolled up to read older ones.
+	var bar := _scroll.get_v_scroll_bar()
+	var at_end := to_end or _scroll.scroll_vertical >= int(bar.max_value - bar.page) - 4
+	_log.text = "\n".join(_lines)
+	if at_end:
+		_scroll_to_end.call_deferred()
+
+
+func _scroll_to_end() -> void:
+	await get_tree().process_frame          # the label's new height is known one frame later
+	_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
+
+
+## A finger on our boxes (BuckdroidTouch hands over the touches that consume_tap took): one that goes down on the
+## message list and moves scrolls it. pos is in the game's base coordinates.
+func overlay_drag(pos: Vector2, relative: Vector2, started: bool) -> void:
+	if started:
+		_drag_scroll = _panel.visible and _scroll.get_global_rect().has_point(pos)
+		return
+	if _drag_scroll:
+		_scroll.scroll_vertical -= int(round(relative.y))
+
+
+## Whether pos (base coordinates) is on the open message list (trackpad mode: a finger put down there scrolls the list
+## instead of moving the cursor).
+func on_message_list(pos: Vector2) -> bool:
+	return _layer.visible and _panel.visible and _scroll.get_global_rect().has_point(pos)
 
 
 func _update_button() -> void:
@@ -312,6 +430,17 @@ func _style(scene: Node) -> void:
 				c.add_theme_color_override(key, color)
 	_entry.add_theme_color_override(&"font_placeholder_color", color.darkened(0.5))
 	_popup.add_theme_color_override(&"font_shadow_color", Color.BLACK)
+	# The list's scroll bar in the same colour: a thin bar, so it is clear the list scrolls.
+	var bar := _scroll.get_v_scroll_bar()
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(color, 0.15)
+	track.content_margin_left = 3
+	track.content_margin_right = 3
+	bar.add_theme_stylebox_override(&"scroll", track)
+	for key in [&"grabber", &"grabber_highlight", &"grabber_pressed"]:
+		var g := StyleBoxFlat.new()
+		g.bg_color = color if key != &"grabber" else Color(color, 0.7)
+		bar.add_theme_stylebox_override(key, g)
 
 
 # --- the on-screen pad (Buttons mode) ----------------------------------------------------------------------------------

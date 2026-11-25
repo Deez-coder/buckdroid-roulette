@@ -747,6 +747,103 @@ func _run() -> void:
 				await _action(p[1])
 			"key":
 				await _key(int(p[1]))
+			"typetext":  # typetext <text, + for spaces>: characters as Android's on-screen keyboard sends them (keycode 0,
+				# the character in unicode, press then release), then the focus and the chat field's text
+				for ch in p[1].replace("+", " "):
+					var k := InputEventKey.new()
+					k.unicode = ch.unicode_at(0)
+					k.pressed = true
+					Input.parse_input_event(k)
+					var r := k.duplicate()
+					r.pressed = false
+					Input.parse_input_event(r)
+					await get_tree().process_frame
+					await get_tree().process_frame
+				var fo2 := get_viewport().gui_get_focus_owner()
+				var chat3 := get_node_or_null(^"/root/BuckdroidChat")
+				_log("typetext: focus %s, chat field '%s'" % [str(fo2.get_path()) if fo2 else "<none>", chat3._entry.text if chat3 else "?"])
+			"chatfill":  # chatfill <n>: n chat messages from another player (scroll test)
+				var chat5 := get_node_or_null(^"/root/BuckdroidChat")
+				for i in int(p[1]):
+					chat5._on_chat(12345, "message number %d, long enough to wrap onto a second line in the chat box" % (i + 1))
+				await get_tree().process_frame
+				await get_tree().process_frame
+				_log("chatfill: %d lines, scroll %d of %d" % [chat5._lines.size(), chat5._scroll.scroll_vertical,
+						int(chat5._scroll.get_v_scroll_bar().max_value - chat5._scroll.get_v_scroll_bar().page)])
+			"chatdrag":  # chatdrag <dy>: a finger down on the chat's message list, moved by dy base pixels, lifted
+				var chat6 := get_node_or_null(^"/root/BuckdroidChat")
+				var before: int = chat6._scroll.scroll_vertical
+				var c0: Vector2 = chat6._scroll.get_global_rect().get_center()
+				var t0 := InputEventScreenTouch.new()
+				t0.index = 0
+				t0.position = _to_window(c0)
+				t0.pressed = true
+				Input.parse_input_event(t0)
+				await get_tree().process_frame
+				var stepv := Vector2(0, float(p[1]) / 10.0)
+				var posv := c0
+				for i in 10:
+					posv += stepv
+					var dd := InputEventScreenDrag.new()
+					dd.index = 0
+					dd.position = _to_window(posv)
+					dd.relative = stepv * (_to_window(Vector2(0, 100)).y - _to_window(Vector2.ZERO).y) / 100.0
+					Input.parse_input_event(dd)
+					await get_tree().process_frame
+				var t1 := t0.duplicate()
+				t1.pressed = false
+				t1.position = _to_window(posv)
+				Input.parse_input_event(t1)
+				await get_tree().process_frame
+				_log("chatdrag %s: scroll %d -> %d, panel %s, field focused %s" % [p[1], before, chat6._scroll.scroll_vertical,
+						chat6._panel.visible, chat6._entry.has_focus()])
+			"stealfocus":  # stealfocus: some game button takes the focus (the chat field should take it back while open)
+				var bootn3 := get_node_or_null(^"/root/BuckdroidBoot")
+				var lui: Node = bootn3._find_by_script(get_tree().current_scene, "MP_LobbyUI.gd") if bootn3 else null
+				if lui:
+					lui.GetFirstUIFocus().grab_focus()
+				await get_tree().process_frame
+				await get_tree().process_frame
+			"chatclose":  # chatclose: a real tap on CLOSE
+				var chat7 := get_node_or_null(^"/root/BuckdroidChat")
+				await _touch(_to_window(chat7._overlay[2].get_global_rect().get_center()))
+				await get_tree().process_frame
+			"enter":  # enter: the Enter key (sends the chat message)
+				var chat8 := get_node_or_null(^"/root/BuckdroidChat")
+				var seen := []
+				var cb := func(ev: InputEvent) -> void: seen.append(ev.as_text())
+				chat8._entry.gui_input.connect(cb)
+				var mapped := []
+				for ev in InputMap.action_get_events("ui_text_submit"):
+					mapped.append(ev.as_text())
+				_log("enter: ui_text_submit = %s, ui_accept has enter %s" % [mapped, InputMap.event_is_action(_enter_event(), "ui_accept")])
+				var ke := InputEventKey.new()
+				ke.keycode = KEY_ENTER
+				ke.pressed = true
+				Input.parse_input_event(ke)
+				var kr := ke.duplicate()
+				kr.pressed = false
+				Input.parse_input_event(kr)
+				await get_tree().process_frame
+				await get_tree().process_frame
+				chat8._entry.gui_input.disconnect(cb)
+				_log("enter: the field saw %s" % [seen])
+			"mousemove":  # mousemove: one mouse movement with speed (what a touch drag or the pad's look-around sends)
+				var mm := InputEventMouseMotion.new()
+				mm.position = _to_window(Vector2(300, 300))
+				mm.global_position = mm.position
+				mm.relative = Vector2(5, 0)
+				mm.velocity = Vector2(200, 0)
+				Input.parse_input_event(mm)
+				await get_tree().process_frame
+				await get_tree().process_frame
+			"chatopen":  # chatopen: open the chat with a real tap on CHAT and tap the text field
+				var chat4 := get_node_or_null(^"/root/BuckdroidChat")
+				if not chat4._panel.visible:
+					await _touch(_to_window(chat4._button.get_global_rect().get_center()))
+					await get_tree().create_timer(0.3).timeout
+				await _touch(_to_window(chat4._entry.get_global_rect().get_center()))
+				_log("chatopen: panel %s, field focused %s" % [chat4._panel.visible, chat4._entry.has_focus()])
 			"inspect":
 				_inspect(p[1])
 			"mobile_settings":  # every project setting with a .mobile override, next to its base value
@@ -933,6 +1030,13 @@ func _action(name: String) -> void:
 	r.pressed = false
 	Input.parse_input_event(r)
 	await get_tree().process_frame
+
+
+func _enter_event() -> InputEventKey:
+	var k := InputEventKey.new()
+	k.keycode = KEY_ENTER
+	k.pressed = true
+	return k
 
 
 func _key(code: int) -> void:

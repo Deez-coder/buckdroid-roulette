@@ -32,7 +32,8 @@ Format: each entry says **what**, **where** (our file or setting), and **why**.
 
 ### Multiplayer (`src/net/`, `src/platform/steam_stub.gd`, `src/ui/chat.gd`, `src/core/boot.gd`)
 - **The game's own multiplayer works without Steam**: the Steam stub answers the game's lobby and packet calls with our peer-to-peer layer (WebRTC; players connect directly, the host relays between the others). Lobby IDs are shared by copy and paste or typed in; on the same Wi-Fi lobbies are also found automatically. Details and the security design: [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). *Why:* the game's multiplayer is built on Steam lobbies, and Android has no Steam.
-- **In-game chat** (`chat.gd`) in the lobby and during a match; can be turned off in the launcher.
+- **In-game chat** (`chat.gd`) in the lobby and during a match; can be turned off in the launcher. The message list scrolls (drag it with a finger in every touch mode, or the mouse wheel; it stays put while you read older messages). Enter / the keyboard's Send key sends (the game's input map has no keys for Godot's `ui_text_submit`, so this is done for our own text fields only).
+- **Typing in Buttons mode** (`chat.gd`): the game's controller code (MP_ControllerManager) remembers every focused control and, while a controller is in use (the on-screen pad counts as one), takes the focus away on the next mouse movement, which closed the keyboard at the first letter. Our boxes are kept out of its memory, and while the chat is open its text field takes the focus back from anything but the player (logged as "chat field lost the focus to ...").
 - **Lobby screen additions** (`boot.gd`): the lobby ID shown as text, a "TYPE A LOBBY ID" box, spaces in a pasted ID ignored, the controller focus restored after a match.
 - The **Multiplayer** button is greyed out ("COMING SOON") only when the network layer is missing from a build.
 
