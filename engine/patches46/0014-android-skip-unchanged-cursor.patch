@@ -1,0 +1,46 @@
+From e72b184fb863ae15b9a0d86eb3a5f51247dc9f2b Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Wed, 25 Nov 2026 15:44:08 +0300
+Subject: [PATCH] Buckdroid: Android skips unchanged custom cursor updates
+ (Java asset lookups every frame)
+
+---
+ platform/android/display_server_android.cpp | 8 ++++++++
+ platform/android/display_server_android.h   | 2 ++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/platform/android/display_server_android.cpp b/platform/android/display_server_android.cpp
+index bae7817..87c16e8 100644
+--- a/platform/android/display_server_android.cpp
++++ b/platform/android/display_server_android.cpp
+@@ -943,6 +943,14 @@ void DisplayServerAndroid::cursor_set_custom_image(const Ref<Resource> &p_cursor
+ 	if (!cursor_path.is_empty()) {
+ 		cursor_path = ProjectSettings::get_singleton()->globalize_path(cursor_path);
+ 	}
++	// Buckdroid: some games set the same custom cursor every frame. On Android each call goes to Java, which looks the
++	// image up in the APK's assets and the file system (zip directory scans, file opens): measured at about 4% of the
++	// game thread. An unchanged image for the same shape is skipped; the result is the same.
++	if (custom_cursor_path[p_shape] == cursor_path && custom_cursor_hotspot[p_shape] == p_hotspot && cursor_shape == p_shape) {
++		return;
++	}
++	custom_cursor_path[p_shape] = cursor_path;
++	custom_cursor_hotspot[p_shape] = p_hotspot;
+ 	OS_Android::get_singleton()->get_godot_java()->get_godot_view()->configure_pointer_icon(android_cursors[cursor_shape], cursor_path, p_hotspot);
+ 	_cursor_set_shape_helper(p_shape, true);
+ }
+diff --git a/platform/android/display_server_android.h b/platform/android/display_server_android.h
+index 49301d4..5620e3f 100644
+--- a/platform/android/display_server_android.h
++++ b/platform/android/display_server_android.h
+@@ -74,6 +74,8 @@ class DisplayServerAndroid : public DisplayServer {
+ 	bool swap_buffers_flag;
+ 
+ 	CursorShape cursor_shape = CursorShape::CURSOR_ARROW;
++	String custom_cursor_path[CURSOR_MAX]; // Buckdroid: last custom cursor per shape (see cursor_set_custom_image)
++	Vector2 custom_cursor_hotspot[CURSOR_MAX];
+ 
+ #if defined(RD_ENABLED)
+ 	RenderingContextDriver *rendering_context = nullptr;
+-- 
+2.53.0.windows.2
+

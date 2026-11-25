@@ -1,0 +1,35 @@
+From 75f0a43c0188b707fc2102a03e6762436dda4e19 Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Wed, 25 Nov 2026 15:44:07 +0300
+Subject: [PATCH] Buckdroid: skip omni shadow lookups on surfaces facing away
+ from the light (result unused)
+
+---
+ .../renderer_rd/shaders/scene_forward_lights_inc.glsl  | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/servers/rendering/renderer_rd/shaders/scene_forward_lights_inc.glsl b/servers/rendering/renderer_rd/shaders/scene_forward_lights_inc.glsl
+index bebd208..054ebd4 100644
+--- a/servers/rendering/renderer_rd/shaders/scene_forward_lights_inc.glsl
++++ b/servers/rendering/renderer_rd/shaders/scene_forward_lights_inc.glsl
+@@ -469,8 +469,16 @@ void light_process_omni(uint idx, vec3 vertex, hvec3 eye_vec, hvec3 normal, vec3
+ 
+ 	half shadow = half(1.0);
+ #ifndef SHADOWS_DISABLED
++	// Buckdroid: a surface facing away from the light gets nothing from it (diffuse and specular both need N.L > 0),
++	// so its shadow value is never used: skip the (soft, many-tap) shadow lookups there. Materials whose lighting does
++	// reach back faces keep them (wrap/toon diffuse, toon specular, backlight, transmittance, rim, clearcoat on the vertex
++	// normal, a custom light() function), and so do lights with a size (their N.L is widened past the horizon).
++	bool omni_shadow_needed = true;
++#if !defined(DIFFUSE_LAMBERT_WRAP) && !defined(DIFFUSE_TOON) && !defined(SPECULAR_TOON) && !defined(LIGHT_BACKLIGHT_USED) && !defined(LIGHT_TRANSMITTANCE_USED) && !defined(LIGHT_RIM_USED) && !defined(LIGHT_CLEARCOAT_USED) && !defined(LIGHT_CODE_USED)
++	omni_shadow_needed = size > half(0.0) || dot(vec3(normal), light_rel_vec) > 0.0;
++#endif
+ 	// Omni light shadow.
+-	if (omni_attenuation > HALF_FLT_MIN && omni_lights.data[idx].shadow_opacity > 0.001) {
++	if (omni_shadow_needed && omni_attenuation > HALF_FLT_MIN && omni_lights.data[idx].shadow_opacity > 0.001) {
+ 		// there is a shadowmap
+ 		vec2 texel_size = scene_data_block.data.shadow_atlas_pixel_size;
+ 		vec4 base_uv_rect = omni_lights.data[idx].atlas_rect;
+-- 
+2.53.0.windows.2
+
