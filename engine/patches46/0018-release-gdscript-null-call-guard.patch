@@ -1,0 +1,65 @@
+From 45c6aef161fab99cf4599849437895f144686f2e Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Wed, 25 Nov 2026 23:02:20 +0300
+Subject: [PATCH] Buckdroid: release builds skip GDScript method calls on null
+ or freed objects instead of crashing
+
+---
+ modules/gdscript/gdscript_vm.cpp | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
+
+diff --git a/modules/gdscript/gdscript_vm.cpp b/modules/gdscript/gdscript_vm.cpp
+index 7ad2ae0..dd9dc8b 100644
+--- a/modules/gdscript/gdscript_vm.cpp
++++ b/modules/gdscript/gdscript_vm.cpp
+@@ -2044,7 +2044,14 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
+ 					OPCODE_BREAK;
+ 				}
+ #else
+-				Object *base_obj = base->operator Object *();
++				// Buckdroid: release builds skip this check, so a game script calling a method on a null or freed object
++				// crashed the whole game (Buckshot Roulette's light flicker asks get_tree() for a timer after its scene
++				// was left). Like debug builds: the call is skipped, the function ends, and the error is logged.
++				Object *base_obj = base->get_validated_object();
++				if (unlikely(!base_obj)) {
++					_err_print_error(FUNCTION_STR, __FILE__, __LINE__, ("Cannot call method '" + String(method->get_name()) + "' on a null or freed value (" + String(name) + ").").utf8().get_data(), false, ERR_HANDLER_SCRIPT);
++					OPCODE_BREAK;
++				}
+ #endif
+ 				Variant **argptrs = instruction_args;
+ 
+@@ -2287,7 +2294,14 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
+ 					OPCODE_BREAK;
+ 				}
+ #else
+-				Object *base_obj = *VariantInternal::get_object(base);
++				// Buckdroid: release builds skip this check, so a game script calling a method on a null or freed object
++				// crashed the whole game (Buckshot Roulette's light flicker asks get_tree() for a timer after its scene
++				// was left). Like debug builds: the call is skipped, the function ends, and the error is logged.
++				Object *base_obj = base->get_validated_object();
++				if (unlikely(!base_obj)) {
++					_err_print_error(FUNCTION_STR, __FILE__, __LINE__, ("Cannot call method '" + String(method->get_name()) + "' on a null or freed value (" + String(name) + ").").utf8().get_data(), false, ERR_HANDLER_SCRIPT);
++					OPCODE_BREAK;
++				}
+ #endif
+ 
+ 				Variant **argptrs = instruction_args;
+@@ -2340,7 +2354,14 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
+ 					OPCODE_BREAK;
+ 				}
+ #else
+-				Object *base_obj = *VariantInternal::get_object(base);
++				// Buckdroid: release builds skip this check, so a game script calling a method on a null or freed object
++				// crashed the whole game (Buckshot Roulette's light flicker asks get_tree() for a timer after its scene
++				// was left). Like debug builds: the call is skipped, the function ends, and the error is logged.
++				Object *base_obj = base->get_validated_object();
++				if (unlikely(!base_obj)) {
++					_err_print_error(FUNCTION_STR, __FILE__, __LINE__, ("Cannot call method '" + String(method->get_name()) + "' on a null or freed value (" + String(name) + ").").utf8().get_data(), false, ERR_HANDLER_SCRIPT);
++					OPCODE_BREAK;
++				}
+ #endif
+ 				Variant **argptrs = instruction_args;
+ #ifdef DEBUG_ENABLED
+-- 
+2.53.0.windows.2
+

@@ -404,3 +404,12 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   frequent cursor-image calls hid this until engine patch 46-0014 skipped unchanged ones. Engine patch 46-0017 forces
   the pointer back when the mouse mode leaves hidden/captured. Not reproducible without a real mouse on a phone.
   (3) user request: Export logs in the launcher (LogExport.java).
+- 2026-11-25 crash at match start on the 1.0.0 release build (tester): "data.tree is null" then SIGSEGV in a
+  SceneTreeTimer create_timer call from a resumed GDScript coroutine. The game's MP_LightFlicker asks get_tree() for a
+  timer after its scene was left (seen before on the PC as a harmless script error). Debug engines catch a method call
+  on null; Godot 4.6 release builds skip that check for validated native calls and crash. Engine patch 46-0018: release
+  builds check the object (get_validated_object) and end the function with a logged error, as debug builds do. A
+  phone-hosted match against a PC copy started and ran 70 s on the new build (the race did not occur in that run).
+- 2026-11-25 trackpad cursor: in multiplayer it followed a leftover single-player CursorManager (always hidden); now it
+  follows the game's mouse mode there. Trackpad moves carry a speed so the game's controller code switches back to the
+  mouse. Tested on the PC (match and lobby) and with a scripted phone run (lobby).
