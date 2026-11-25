@@ -165,7 +165,7 @@ public class LauncherActivity extends KitActivity {
         JSONObject s = status();
         LinearLayout card = card();
         card.addView(text("Buckshot Roulette", 20, TEXT, true));
-        card.addView(text("Single player. Multiplayer is coming later.", 13, DIM, false));
+        card.addView(text("Single player and online multiplayer with chat.", 13, DIM, false));
         card.addView(space(12));
         card.addView(statusLine("Game", busy ? "setting up..." : ready ? "ready" : "not set up yet", ready ? OK : busy ? ACCENT2 : WARN));
         if (ready) card.addView(statusLine("Version", s.optString("detail").replace(" is ready", "").replaceAll("\\s*\\(.*\\)\\.?$", ""), DIM));

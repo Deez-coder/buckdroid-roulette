@@ -25,12 +25,15 @@ Format: each entry says **what**, **where** (our file or setting), and **why**.
 - Android only: `rendering/textures/vram_compression/import_etc2_astc = true`, `display/window/handheld/orientation = 4` (sensor landscape), `debug/file_logging/enable_file_logging = true`.
 
 ### Platform (`src/platform/`)
-- **Steam stub** (`steam_stub.gd`, autoload `Steam`): an offline replacement for the GodotSteam functions, signals and constants the game uses. Never logged on, no lobbies or networking. *Why:* Steam does not exist on Android; the game has no ownership check, so nothing is bypassed.
+- **Steam stub** (`steam_stub.gd`, autoload `Steam`): an offline replacement for the GodotSteam functions, signals and constants the game uses. Never logged on; lobbies and packets go to our own multiplayer layer (see Multiplayer). *Why:* Steam does not exist on Android; the game has no ownership check, so nothing is bypassed.
 - **Local achievements** (`platform.gd`): achievements the game unlocks are stored in `user://buckdroid/achievements.cfg`. *Why:* replaces Steam achievements.
 - **Offline leaderboard** (`steam_stub.gd` + `platform.gd`): the Double-or-Nothing board shows this device's best score only, stored in `user://buckdroid/scores.cfg`. *Why:* the online board needs Steam; the game's board screen works unchanged.
 
-### Multiplayer (`src/core/boot.gd`)
-- The main menu's **Multiplayer** button is greyed out, cannot be pressed or focused, and shows "COMING SOON". *Why:* the game's multiplayer is built on Steam lobbies; a local multiplayer backend is planned for later.
+### Multiplayer (`src/net/`, `src/platform/steam_stub.gd`, `src/ui/chat.gd`, `src/core/boot.gd`)
+- **The game's own multiplayer works without Steam**: the Steam stub answers the game's lobby and packet calls with our peer-to-peer layer (WebRTC; players connect directly, the host relays between the others). Lobby IDs are shared by copy and paste or typed in; on the same Wi-Fi lobbies are also found automatically. Details and the security design: [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). *Why:* the game's multiplayer is built on Steam lobbies, and Android has no Steam.
+- **In-game chat** (`chat.gd`) in the lobby and during a match; can be turned off in the launcher.
+- **Lobby screen additions** (`boot.gd`): the lobby ID shown as text, a "TYPE A LOBBY ID" box, spaces in a pasted ID ignored, the controller focus restored after a match.
+- The **Multiplayer** button is greyed out ("COMING SOON") only when the network layer is missing from a build.
 
 ### Input (`src/input/touch_adapter.gd`)
 - **Touch adapter**: a touch moves the pointer, then presses 3 frames (about 50 ms) later; the release always follows its press. Positions are converted from game space back to window pixels before re-sending. *Why:* the game only acts on a click when something was already under the pointer, so with Godot's emulation every tap on a 3D object missed.
