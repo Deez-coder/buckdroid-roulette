@@ -28,6 +28,13 @@ func _ready() -> void:
 			script_path = arg.trim_prefix("--bd-script=")
 		elif arg.begins_with("--bd-out="):
 			_out = arg.trim_prefix("--bd-out=")
+	if script_path.is_empty() and OS.get_name() == "Android":
+		# On a phone (no command line): <app files>/dev/script.txt, shots and log lines into <app files>/dev/out
+		var parts := OS.get_user_data_dir().split("/", false)
+		var dev := "/storage/emulated/0/Android/data/%s/files/dev" % (parts[parts.size() - 2] if parts.size() >= 2 else "")
+		if FileAccess.file_exists(dev.path_join("script.txt")):
+			script_path = dev.path_join("script.txt")
+			_out = dev.path_join("out")
 	if script_path.is_empty():
 		return
 	DirAccess.make_dir_recursive_absolute(_out)

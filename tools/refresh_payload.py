@@ -5,7 +5,7 @@ The game's files are copied unchanged; only res://buckdroid/* and the extension 
 entries are rewritten from patches/autoloads.json (ours first, before the game's own). For testing on a developer's own
 phone: pull the converted game.pck, refresh it, push it back. The output never leaves the developer's devices.
 
-    python tools/refresh_payload.py <converted game.pck> <out.pck>
+    python tools/refresh_payload.py <converted game.pck> <out.pck> [--dev]
 """
 from __future__ import annotations
 
@@ -24,7 +24,9 @@ EXTENSION_LIST = "res://.godot/extension_list.cfg"
 
 
 def main() -> None:
-    src, out = sys.argv[1], sys.argv[2]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    dev = "--dev" in sys.argv          # also the dev test driver (src_dev/test_driver.gd), for tests on the own phone
+    src, out = args[0], args[1]
     pck = Pck(src)
     payload = build_converter_pck.collect()
     ours = {RES + p[len("res://payload/buckdroid/"):]: d for p, d in payload.items() if p.startswith("res://payload/buckdroid/")}
@@ -38,6 +40,10 @@ def main() -> None:
     first_game = next(k for k in pb.keys() if k.startswith("autoload/"))
     for a in json.loads(payload["res://payload/autoloads.json"])["autoloads"]:
         pb.insert_before(first_game, "autoload/" + a["name"], "*" + RES + a["script"])
+    if dev:
+        with open(os.path.join(ROOT, "src_dev", "test_driver.gd"), "rb") as f:
+            ours[RES + "dev/test_driver.gd"] = f.read()
+        pb.insert_before(first_game, "autoload/BuckdroidTestDriver", "*" + RES + "dev/test_driver.gd")
     ours["res://project.binary"] = pb.to_bytes()
 
     items = []
