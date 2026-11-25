@@ -52,7 +52,7 @@ public final class TouchPad extends View {
     static final class Finger { int id = -1, button = -1; boolean look; float x0, y0, lx, ly; }
     float sentTrigger = 0f;                        /* the left trigger (free look), as last sent */
     float lookSpeed = 1f;                          /* controls.ini look_speed */
-    static final float LOOK_SCALE = 0.4f;          /* screen pixels -> game mouse units (the game turns 0.25 degree each) */
+    static final float LOOK_SCALE = 0.8f;          /* screen pixels -> game mouse units (the game turns 0.25 degree each); user: 0.4 felt slow */
     final Finger[] fingers = new Finger[10];
     int sent;                                      /* the joypad buttons Godot has as pressed, bits by TouchLayout index */
     float aspect = 16f / 9f;

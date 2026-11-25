@@ -49,7 +49,7 @@ var tap_assist := false           # controls.ini tap_assist
 var look_speed := 1.0             # controls.ini look_speed
 
 const LOOK_ACTION := &"free look toggle"
-const LOOK_SCALE := 0.5           # base pixels of finger movement -> game mouse units (the game turns 0.25 degree each)
+const LOOK_SCALE := 1.0           # base pixels of finger movement -> game mouse units (the game turns 0.25 degree each); doubled after playtest
 var _touching := {}               # finger index -> position
 var _look := false
 var _look_accum := Vector2.ZERO
