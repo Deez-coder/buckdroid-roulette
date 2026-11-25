@@ -389,3 +389,10 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   Chat list: ScrollContainer, 100 messages, finger drag in Tap/Buttons (overlay touches) and Trackpad (a finger put
   down on the list), stays where the reader is when new messages arrive. Tested on the PC (lobby and match, two copies);
   the phone was not connected for a phone run.
+- 2026-11-25 the keyboard fix above was not it (tester: still closes). The phone log showed no focus change, only the
+  game asking Android to hide the keyboard right after the keyboard sent a key event. Cause: the game binds Backspace to
+  ui_cancel (and has no ui_text_* keys); LineEdit ends editing on ui_cancel and hides the keyboard; Samsung's keyboard
+  sends Backspace by itself while composing/correcting. Fix: BuckdroidKeyGuard (last child of the root, so first in
+  _input) hands keys to BuckdroidChat while one of our fields is edited, which edits the field itself. Phone check
+  (release engine, Buttons mode, scripted keys): keyboard shown at the tap and still up after typing and two
+  Backspaces; only the test's quit hid it.

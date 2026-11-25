@@ -59,6 +59,74 @@ func _ready() -> void:
 	_build()
 	# After the game's own handler (deferred): see _on_focus_changed.
 	get_viewport().gui_focus_changed.connect(_on_focus_changed, CONNECT_DEFERRED)
+	_key_guard = Node.new()
+	_key_guard.name = "BuckdroidKeyGuard"
+	_key_guard.set_script(_KeyGuard)
+	get_tree().root.add_child.call_deferred(_key_guard)
+
+
+# --- typing ------------------------------------------------------------------------------------------------------------
+# This game's input map binds Backspace to "ui_cancel" and has no keys for Godot's text-editing actions
+# (ui_text_backspace, ui_text_delete, ui_text_submit, ...). In a LineEdit, ui_cancel ends the editing and closes the
+# phone keyboard, and Samsung's keyboard sends a Backspace by itself while typing (when it corrects or capitalises the
+# word being typed), so the keyboard closed at the first letter and Backspace never deleted (tester report on the S24
+# Ultra; the log showed no focus change, only the game asking Android to hide the keyboard). While one of our text
+# fields is being typed in, BuckdroidKeyGuard (the root's last child, so its _input comes before every game script's)
+# hands every key here: characters, Backspace, Delete, arrows, Home/End, Enter and paste are done on the field
+# directly, and the key goes no further (the game does not react to keys typed into the chat either).
+const _KeyGuard := preload("res://buckdroid/ui/key_guard.gd")
+var _key_guard: Node
+
+
+func _guard_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var field := get_viewport().gui_get_focus_owner() as LineEdit
+	if field == null or not _overlay.has(field) or not field.is_editing() or not field.is_visible_in_tree():
+		return
+	get_viewport().set_input_as_handled()
+	if not event.pressed:
+		return
+	var k: Key = event.keycode
+	match k:
+		KEY_BACKSPACE:
+			if field.has_selection():
+				field.delete_text(field.get_selection_from_column(), field.get_selection_to_column())
+			elif field.caret_column > 0:
+				field.delete_text(field.caret_column - 1, field.caret_column)
+		KEY_DELETE:
+			if field.has_selection():
+				field.delete_text(field.get_selection_from_column(), field.get_selection_to_column())
+			elif field.caret_column < field.text.length():
+				field.delete_text(field.caret_column, field.caret_column + 1)
+		KEY_LEFT:
+			field.caret_column = maxi(0, field.caret_column - 1)
+		KEY_RIGHT:
+			field.caret_column = mini(field.text.length(), field.caret_column + 1)
+		KEY_HOME:
+			field.caret_column = 0
+		KEY_END:
+			field.caret_column = field.text.length()
+		KEY_ENTER, KEY_KP_ENTER:
+			if not event.echo:
+				field.text_submitted.emit(field.text)
+		KEY_ESCAPE, KEY_BACK:          # stop typing (Android Back while the keyboard is up)
+			_letting_go = true
+			field.release_focus()
+			_letting_go = false
+		_:
+			if (event.ctrl_pressed or event.meta_pressed) and k == KEY_V:
+				field.insert_text_at_caret(DisplayServer.clipboard_get().strip_escapes())
+			elif event.unicode >= 32 and not event.ctrl_pressed and not event.alt_pressed:
+				field.insert_text_at_caret(char(event.unicode))
+				field.text_changed.emit(field.text)
+
+
+func _process_key_guard() -> void:
+	# Scene changes add the new scene after it: move it back to the end so it stays first in line for keys.
+	var root := get_tree().root
+	if _key_guard and _key_guard.is_inside_tree() and root.get_child(root.get_child_count() - 1) != _key_guard:
+		root.move_child(_key_guard, root.get_child_count() - 1)
 
 
 # --- focus: keep the game's controller code off our boxes --------------------------------------------------------------
@@ -241,6 +309,7 @@ func _build() -> void:
 
 
 func _process(delta: float) -> void:
+	_process_key_guard()
 	var scene := get_tree().current_scene
 	var path: String = scene.scene_file_path if scene else ""
 	if path != _scene_path:
