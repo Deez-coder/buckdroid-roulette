@@ -9,6 +9,10 @@
  * game does nothing and only the buttons act. The buttons hide while a real controller is used and come back at the next
  * touch. The small ring at the top centre hides them for this session (touches still do nothing then).
  *
+ * Looking around (multiplayer free look): a finger that starts on an empty spot holds the left trigger (the game's
+ * controller binding for free look) and works as a floating left stick from where it landed (the game turns the camera
+ * with the left stick while the trigger is held). Lifting it lets go of both.
+ *
  * controls.ini (read at start and again when it changes, about once a second):
  *   touch_mode = direct | relative | pad   (the view is only added for pad)
  *   touch_opacity = 0.1..1 (0.45)   touch_scale = 0.6..1.6 (1.0)   pos_<KEY> = x y size (TouchLayout)
@@ -44,7 +48,9 @@ public final class TouchPad extends View {
     long iniTime = -1, iniCheckedAt;
     boolean hiddenByRing, hiddenByController;
 
-    static final class Finger { int id = -1, button = -1; }
+    static final class Finger { int id = -1, button = -1; boolean look; float x0, y0, lx, ly; }
+    static final float LOOK_RADIUS = 0.12f;        /* full stick throw, in parts of the screen height */
+    float[] sentAxes = new float[3];               /* left stick x, y and the left trigger, as last sent */
     final Finger[] fingers = new Finger[10];
     int sent;                                      /* the joypad buttons Godot has as pressed, bits by TouchLayout index */
     float aspect = 16f / 9f;
@@ -134,14 +140,21 @@ public final class TouchPad extends View {
                     || ((kind == MotionEvent.ACTION_UP || kind == MotionEvent.ACTION_POINTER_UP) && i == idx);
             Finger f = null;
             for (Finger g : fingers) if (g.id == id) f = g;
-            if (up) { if (f != null) { f.id = -1; f.button = -1; } continue; }
+            if (up) { if (f != null) { f.id = -1; f.button = -1; f.look = false; } continue; }
             float x = e.getX(i) / W, y = e.getY(i) / H;
             int b = hitButton(x, y);
-            if (f == null) {                       /* a new finger: only one that lands on a button counts */
-                if (b < 0) continue;
+            if (f != null && f.look) {             /* the look finger: its offset is the stick */
+                f.lx = x; f.ly = y; continue;
+            }
+            if (f == null) {                       /* a new finger: on a button it presses it, elsewhere it looks around */
+                boolean looking = false;
+                for (Finger g : fingers) if (g.id >= 0 && g.look) looking = true;
+                if (b < 0 && looking) continue;
                 for (Finger g : fingers) if (g.id < 0) { f = g; break; }
                 if (f == null) continue;
-                f.id = id; f.button = b;
+                f.id = id;
+                if (b < 0) { f.look = true; f.button = -1; f.x0 = f.lx = x; f.y0 = f.ly = y; continue; }
+                f.button = b;
                 if (TouchLayout.BIT[b] == TouchLayout.MENU) activity.runOnUiThread(this::menu);
             } else if (b >= 0 && b != f.button && ((isFace(b) && isFace(f.button)) || (isDpad(b) && isDpad(f.button)))) {
                 f.button = b;                      /* rolling the thumb across A/B or around the D-pad */
@@ -156,8 +169,25 @@ public final class TouchPad extends View {
         else activity.onBackPressed();
     }
 
-    /* Sends the buttons that changed to Godot and redraws. */
+    /* Sends the buttons and look axes that changed to Godot and redraws. */
     void update() {
+        float[] axes = new float[3];
+        for (Finger f : fingers) {
+            if (f.id < 0 || !f.look) continue;
+            axes[2] = 1f;
+            float[] d = lookOffset(f);
+            axes[0] = d[0]; axes[1] = d[1];
+        }
+        Godot gl = godot;
+        if (gl != null) {
+            for (int a = 0; a < 3; a++) {
+                if (Math.abs(axes[a] - sentAxes[a]) < 0.01f) continue;
+                sentAxes[a] = axes[a];
+                final int axis = a == 2 ? 4 : a;       /* Godot: 0/1 left stick, 4 left trigger */
+                final float v = axes[a];
+                gl.runOnRenderThread(() -> GodotLib.joyaxis(PAD_ID, axis, v));
+            }
+        }
         int now = 0;
         for (Finger f : fingers) if (f.id >= 0 && f.button >= 0 && TouchLayout.BIT[f.button] >= 0) now |= 1 << f.button;
         int changed = now ^ sent;
@@ -173,8 +203,16 @@ public final class TouchPad extends View {
         invalidate();
     }
     void release() {
-        for (Finger f : fingers) { f.id = -1; f.button = -1; }
+        for (Finger f : fingers) { f.id = -1; f.button = -1; f.look = false; }
         update();
+    }
+
+    /* The look finger's offset from where it landed, as stick values -1..1 (y down, as Godot's stick axes). */
+    float[] lookOffset(Finger f) {
+        float r = LOOK_RADIUS * scale;
+        float dx = (f.lx - f.x0) * aspect / r, dy = (f.ly - f.y0) / r, m = (float) Math.sqrt(dx * dx + dy * dy);
+        if (m > 1) { dx /= m; dy /= m; }
+        return new float[]{dx, dy};
     }
 
     /* ------------------------------------------------------------ drawing */

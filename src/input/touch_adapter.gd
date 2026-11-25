@@ -25,6 +25,11 @@
 ##   raycast the game uses. Small items and buttons get easier to hit with a finger.
 ##
 ## Only the first finger acts as the mouse.
+##
+## Look around (multiplayer free look): on PC it is the right mouse button held while moving the mouse. Here two fingers
+## on the screen hold it (InputEventAction "free look toggle"), and their movement becomes the mouse movement; lifting
+## them lets the game turn the camera back as it does on PC. A first finger's tap that has not happened yet is dropped;
+## the remaining finger does nothing until all fingers are up. controls.ini look_speed (0.25 - 3, default 1.0).
 extends Node
 
 const HOVER_FRAMES := 3            # direct mode: frames between the pointer move and the press (50 ms at 60 fps)
@@ -41,6 +46,14 @@ var mode := "direct"
 var cursor_speed := 1.0           # controls.ini cursor_speed: cursor movement per finger movement (0.25 - 4)
 var cursor_size := 1.0            # controls.ini cursor_size: cursor image scale (0.5 - 3)
 var tap_assist := false           # controls.ini tap_assist
+var look_speed := 1.0             # controls.ini look_speed
+
+const LOOK_ACTION := &"free look toggle"
+const LOOK_SCALE := 0.5           # base pixels of finger movement -> game mouse units (the game turns 0.25 degree each)
+var _touching := {}               # finger index -> position
+var _look := false
+var _look_accum := Vector2.ZERO
+var _look_suppress := false       # after a look: ignore the fingers until all are up
 
 var _queue: Array = []             # [{frames_left: int, event: InputEvent}]
 var _finger_down := false
@@ -93,6 +106,7 @@ func _read_settings() -> void:
 	cursor_speed = clampf(settings.get_float("controls", "cursor_speed", 1.0), 0.25, 4.0)
 	cursor_size = clampf(settings.get_float("controls", "cursor_size", 1.0), 0.5, 3.0)
 	tap_assist = settings.get_value("controls", "tap_assist") == "on"
+	look_speed = clampf(settings.get_float("controls", "look_speed", 1.0), 0.25, 3.0)
 
 
 # --- input ---------------------------------------------------------------------------------------------------------
@@ -100,6 +114,8 @@ func _read_settings() -> void:
 func _input(event: InputEvent) -> void:
 	if _debug and (event is InputEventScreenTouch or event is InputEventMouseButton):
 		print("[bd-touch] in ", event)
+	if (event is InputEventScreenTouch or event is InputEventScreenDrag) and _handle_look(event):
+		return
 	if mode == "relative":
 		_input_relative(event)
 	else:
@@ -148,7 +164,70 @@ func _input_relative(event: InputEvent) -> void:
 		_move_to(_cursor, event.relative * cursor_speed)
 
 
+## Two fingers: look around (see header). Returns true when the event belongs to a look and must not act as a tap.
+func _handle_look(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_touching[event.index] = event.position
+			if _touching.size() >= 2 and not _look and not _look_suppress and InputMap.has_action(LOOK_ACTION):
+				_start_look()
+				return true
+		else:
+			_touching.erase(event.index)
+			if _look:
+				_end_look()
+				return true
+			if _look_suppress:
+				if _touching.is_empty():
+					_look_suppress = false
+				return true
+		return _look or _look_suppress
+	if event is InputEventScreenDrag:
+		_touching[event.index] = event.position
+		if _look:
+			_look_accum += event.relative / 2.0   # two fingers: their average movement
+			return true
+		return _look_suppress
+	return false
+
+
+func _start_look() -> void:
+	# The first finger's tap must not happen: drop it if it is still waiting, finish it if it was already pressed.
+	_queue = _queue.filter(func(item): return not (item.event is InputEventMouseButton))
+	if _press_sent and _finger_down:
+		_queue.append({"frames_left": 0, "event": _button(_last_pos_base(), false)})
+	_finger_down = false
+	_release_pending = null
+	_look = true
+	_look_accum = Vector2.ZERO
+	var a := InputEventAction.new()
+	a.action = LOOK_ACTION
+	a.pressed = true
+	Input.parse_input_event(a)
+
+
+func _end_look() -> void:
+	_look = false
+	_look_suppress = not _touching.is_empty()
+	var a := InputEventAction.new()
+	a.action = LOOK_ACTION
+	a.pressed = false
+	Input.parse_input_event(a)
+
+
+func _last_pos_base() -> Vector2:
+	return get_tree().root.get_final_transform().affine_inverse() * _last_pos
+
+
 func _process(_delta: float) -> void:
+	if _look and _look_accum != Vector2.ZERO:
+		# One movement event a frame (the game keeps only the last one it sees before turning the camera).
+		var m := InputEventMouseMotion.new()
+		m.position = _last_pos
+		m.global_position = _last_pos
+		m.relative = _look_accum * LOOK_SCALE * look_speed
+		_look_accum = Vector2.ZERO
+		Input.parse_input_event(m)
 	var still: Array = []
 	for item in _queue:
 		if item.frames_left > 0:

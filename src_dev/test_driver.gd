@@ -129,6 +129,44 @@ func _run() -> void:
 						l.shadow_caster_mask |= bit
 					lights += 1
 				_log("castmask: %d objects, %d lights, %s" % [marked, lights, p[3]])
+			"twofinger":  # twofinger <dx> <dy> <shot name>: two fingers down at the centre, drag by (dx, dy) base pixels in 20
+				# steps, take a shot while they are still down, then lift them (multiplayer look-around test)
+				var c0 := Vector2(440, 300)
+				var c1 := Vector2(520, 300)
+				for idx in 2:
+					var t := InputEventScreenTouch.new()
+					t.index = idx
+					t.position = _to_window(c0 if idx == 0 else c1)
+					t.pressed = true
+					Input.parse_input_event(t)
+					await get_tree().process_frame
+				var step := Vector2(float(p[1]), float(p[2])) / 20.0
+				for i in 20:
+					for idx in 2:
+						var d := InputEventScreenDrag.new()
+						d.index = idx
+						var base := (c0 if idx == 0 else c1) + step * (i + 1)
+						d.position = _to_window(base)
+						d.relative = step
+						Input.parse_input_event(d)
+					await get_tree().process_frame
+				await get_tree().create_timer(0.3).timeout
+				await RenderingServer.frame_post_draw
+				get_viewport().get_texture().get_image().save_png(_out.path_join(p[3] + ".png"))
+				for idx in 2:
+					var t := InputEventScreenTouch.new()
+					t.index = idx
+					t.position = _to_window(c0 + step * 20)
+					t.pressed = false
+					Input.parse_input_event(t)
+				_log("twofinger %s %s done" % [p[1], p[2]])
+			"inputmap":  # inputmap <action, + for spaces>: the events bound to an action
+				var an := p[1].replace("+", " ")
+				if InputMap.has_action(an):
+					for ev in InputMap.action_get_events(an):
+						_log("inputmap %s: %s" % [an, ev.as_text()])
+				else:
+					_log("inputmap: no action " + an)
 			"camturn":  # camturn <yaw degrees> <pitch degrees>: look around with a temporary camera at the game camera's place
 				# (the game sets its own camera every frame); "camturn reset" gives the view back to the game's camera
 				var game_cam: Camera3D = get_meta("bd_game_cam") if has_meta("bd_game_cam") else get_viewport().get_camera_3d()

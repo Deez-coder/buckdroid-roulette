@@ -335,6 +335,8 @@ public class LauncherActivity extends KitActivity {
             t.addView(toggle(c, "tap_assist", "Tap assist", "on", "off", "off",
                     "A tap that just misses goes to the nearest thing you can use."));
         }
+        t.addView(slider(c, "look_speed", "Look-around speed", 25, 300, 25, 100, "%", 0.01f,
+                "Multiplayer: drag with two fingers to look around (Buttons mode: one finger on an empty spot)."));
         content.addView(t);
 
         LinearLayout pad = card();

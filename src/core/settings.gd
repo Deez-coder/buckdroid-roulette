@@ -20,7 +20,7 @@ signal controls_changed
 
 const DEFAULTS := {
 	"graphics": {"shadow_mode": "", "fps_cap": "", "fps_counter": "off", "idle_fps": "", "telemetry": "off", "transparency_fallback": "", "render_scale": "", "shadow_refresh": "", "shadow_resolution": "", "shadow_softness": "", "mesh_detail": "", "thermal_guard": "", "thermal_guard_level": ""},   # "" = let BuckdroidRender pick the platform default
-	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00", "tap_assist": "off"},
+	"controls": {"touch_mode": "direct", "cursor_speed": "1.00", "cursor_size": "1.00", "tap_assist": "off", "look_speed": "1.00"},
 	"multiplayer": {"nickname": "", "chat": "on"},   # nickname "" = "Player" and 4 digits of the player ID
 }
 
@@ -136,6 +136,8 @@ cursor_speed = 1.00
 cursor_size = 1.00
 ; Direct mode: a tap that misses goes to the nearest object you can use (easier to hit small items). on or off.
 tap_assist = off
+; Multiplayer: looking around with two fingers (one finger on an empty spot in Buttons mode). Speed 0.25 - 3.
+look_speed = 1.00
 ; pad mode: the buttons' opacity (0.1 - 1) and size (0.6 - 1.6); pos_<button> = x y size lines come from the layout editor.
 touch_opacity = 0.45
 touch_scale = 1.00
