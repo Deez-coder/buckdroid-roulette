@@ -310,3 +310,4 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   minute once cooled, never above the player's own limits. Each step checked on the phone (forced through the test
   hook force_step). Launcher "Cooler shadows" switch (Graphics -> Picture): sets shadow softness 1 and shadow detail
   2048 (about -30% GPU in a multiplayer match, screenshots look the same); off by default.
+- 2026-11-25 (user away; *choice*): soft shadow quality 1 in the multiplayer match compared on frozen PC frames (5 views): 8-15% of pixels change by more than 12 levels, and zoomed in the item shadows on the table come out darker with a different pattern: visible, so it stays an option (Cooler shadows), not a default. Overhead light hit1 shadow off: identical frames (built in). Table lights not lighting the room: 9-62% of the picture changes (rejected).
