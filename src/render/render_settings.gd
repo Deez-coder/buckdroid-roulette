@@ -50,13 +50,6 @@
 ##    picture, so theirs stay). Its shadow is turned off; the light itself still shines and flashes. Saves its shadow
 ##    map and, more importantly on phones, the soft shadow lookups for that light on every pixel it lights.
 ##
-## 7. 16-bit shadow atlas in the multiplayer match (phones). Measured on the phone as GPU load (clock x busy): the five
-##    table fill lights' shadows are 60% of the load, not because of triangles (simplified shadow meshes with half the
-##    triangles saved 2%) but because their ten shadow passes are redrawn every frame (the players always move) and each
-##    writes its part of the 32-bit atlas to memory. A 16-bit atlas halves that traffic: load 540 -> 353 (-34%), GPU
-##    clock about 640 -> 485 MHz, the table view identical (0.08% of pixels, blinking lights). The 32-bit atlas is kept
-##    elsewhere: it was chosen for Godot 4.1, where 16 bits lost the dealer's face shadows on this GPU, and single player
-##    gains nothing from 16 bits (its shadows are cached: load 282 vs 277).
 ##
 ## Phase 5 turns this into the Low / Medium / High presets.
 extends Node
@@ -309,7 +302,6 @@ func _update_outdoor_lights() -> void:
 		_interior_box = _find_interior_box(scene)
 		if _interior_box.has_volume():
 			_room_out_of_table_shadows(scene)
-		_set_match_atlas_16(_interior_box.has_volume() and (is_android or OS.get_cmdline_user_args().has("--bd-mobile-render")))
 	if _outdoor.is_empty():
 		return
 	var cam := get_viewport().get_camera_3d()
@@ -340,24 +332,6 @@ func _room_out_of_table_shadows(scene: Node) -> void:
 				l.shadow_caster_mask &= ~ROOM_LAYER_BIT
 				lights += 1
 	print("[buckdroid] %d room objects out of %d table lights' shadows" % [marked, lights])
-
-
-# --- 7. 16-bit shadow atlas in the multiplayer match -------------------------------------------------------------------
-var _atlas_16_was := false
-var _atlas_16_active := false
-
-
-func _set_match_atlas_16(on: bool) -> void:
-	var root := get_tree().root
-	if on == _atlas_16_active:
-		return
-	if on:
-		_atlas_16_was = root.positional_shadow_atlas_16_bits
-		root.positional_shadow_atlas_16_bits = true
-	else:
-		root.positional_shadow_atlas_16_bits = _atlas_16_was
-	_atlas_16_active = on
-	print("[buckdroid] shadow atlas %s bits (multiplayer match %s)" % ["16" if on else ("16" if _atlas_16_was else "32"), "entered" if on else "left"])
 
 
 ## The box around the club interior's geometry (world space), or an empty box if the scene has no such interior.
