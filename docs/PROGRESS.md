@@ -305,3 +305,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   shadow quality 1 (-24%, must be set at start: switching mid-game recompiles shaders). Frame-rate caps cut GPU work
   roughly in proportion. Proposed: heat guard steps shadow resolution first, then frame rate, resolution last;
   optional "cooler shadows" setting (soft 1 + atlas 2048).
+- 2026-11-25, heat (user choice: both). Heat guard steps, cheapest-looking first: (1) shadow atlas halved,
+  (2) fps limit 50, (3) fps limit 40, (4+) 3D scale -10% per step to 70%; one step per 10 s while hot, one back per
+  minute once cooled, never above the player's own limits. Each step checked on the phone (forced through the test
+  hook force_step). Launcher "Cooler shadows" switch (Graphics -> Picture): sets shadow softness 1 and shadow detail
+  2048 (about -30% GPU in a multiplayer match, screenshots look the same); off by default.
