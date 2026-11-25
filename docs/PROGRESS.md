@@ -316,3 +316,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   multiplayer is played with two-finger looks and the on-screen pad. FrameRate.java sets
   View.REQUESTED_FRAME_RATE_CATEGORY_NORMAL on every view of the game window (on create, resume and window focus;
   engine patch 46-0012). Built, not yet checked on the phone (needs a SurfaceFlinger log while touching).
+- 2026-11-25: invisible-change candidates for the multiplayer table are exhausted on the PC (lobby/menus already cheap;
+  scripts, physics, animations not measurable; pixel count barely matters on the phone). What is left visibly changes
+  the picture and stays optional (Cooler shadows) or automatic only when hot (heat guard). Next on the phone: install
+  .work/buckdroid.apk (launcher quick-updates the scripts), a multiplayer heat run, and a SurfaceFlinger check that the
+  display stays at 60 Hz while touching.
