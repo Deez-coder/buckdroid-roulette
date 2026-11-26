@@ -1,7 +1,7 @@
 # Buckdroid Roulette
 
-An Android launcher that lets people who own **Buckshot Roulette** on Steam play their own copy on an Android phone,
-single player and online multiplayer.
+I made Buckdroid Roulette so that people who own **Buckshot Roulette** on Steam can play their own copy on an Android
+phone, single player and online multiplayer.
 
 - **You need to own the game.** The app contains no part of Buckshot Roulette: no game files, art, audio, music, scripts or
   other content. You copy the game file from your own Steam installation to your phone, and the app converts it there.
@@ -11,7 +11,7 @@ single player and online multiplayer.
 
 ## How it works
 
-1. Install the Buckdroid Roulette app (the launcher APK; the only file this project publishes).
+1. Install the Buckdroid Roulette app (the launcher APK; the only file I publish).
 2. Copy `Buckshot Roulette.exe` from your Steam folder to the phone (Steam: right-click the game > Manage > Browse local
    files) and pick it in the app.
 3. The app checks that it is a supported version, converts it for the phone (textures, settings, Android fixes) and
@@ -58,7 +58,7 @@ Vulkan.
 
 ## Lower-end phones
 
-The defaults aim at the PC look and were tuned on a high-end phone (Galaxy S24 Ultra). On a slower or older phone,
+The defaults aim at the PC look, and I tuned them on a high-end phone (Galaxy S24 Ultra). On a slower or older phone,
 open the launcher's **Graphics** page and lower things until the game runs smoothly. Roughly from most to least effect:
 
 1. **3D resolution**: 70-80% is hard to notice on a phone screen and saves a lot.
@@ -72,31 +72,31 @@ Turn on the **Performance overlay** to see the frame rate (and in multiplayer th
 
 ## Made with AI
 
-This project was built with heavy use of AI. Most of the code, the engine patches, the testing tools and the
-documentation were written by Claude, an AI model by Anthropic (in Claude Code). The project owner directed the work,
-made the decisions and tested everything on real phones.
+I built this project with heavy use of AI. Most of the code, the engine patches, the testing tools and the
+documentation were written by Claude, an AI model by Anthropic (in Claude Code). I directed the work, made the
+decisions and tested everything on real phones.
 
 ## Credits
 
-- **Deez-coder**: project owner, direction, design decisions, testing.
+- **Me (Deez-coder)**: the project, direction, design decisions, testing.
 - **Claude** (Anthropic): code, engine patches, tools, documentation.
-- **v1** (Discord: `v1_fromultrakill__04991`): testing the game and multiplayer.
-- **Buckshot Roulette** is made by Mike Klubnika and published by CRITICAL REFLEX. This project only makes your own copy
-  run on Android. Please [buy the game](https://store.steampowered.com/app/2835570/Buckshot_Roulette/).
+- **v1** (Discord: `v1_fromultrakill__04991`): testing the game and multiplayer with me.
+- **Buckshot Roulette** is made by Mike Klubnika and published by CRITICAL REFLEX. Buckdroid Roulette only makes your own
+  copy run on Android. Please [buy the game](https://store.steampowered.com/app/2835570/Buckshot_Roulette/).
 
 **Discord**
-- [Deez-coder's server](https://discord.gg/b9GN2Ypktw): the home of all of Deez-coder's ports.
+- [Deez-coder's server](https://discord.gg/b9GN2Ypktw): my server, the home of all my ports.
 - [V Alpha server](https://discord.gg/y9YrUfNj7Y)
 
 ## License
 
-The project's own code (everything in this repository) is licensed under the **GNU General Public License v3.0 or later**,
+My project's own code (everything in this repository) is licensed under the **GNU General Public License v3.0 or later**,
 see [LICENSE](LICENSE). The license covers only this project's code. It does not cover, and grants no rights to,
 Buckshot Roulette or any of its content.
 
 The app is built on the [Godot Engine](https://godotengine.org) 4.6 (MIT license) with a few patches in
 `engine/patches46/`, uses [webrtc-native](https://github.com/godotengine/webrtc-native) (MIT) for multiplayer, and its
-launcher look comes from the owner's own launcher UI kit (GPL-3.0-or-later).
+launcher look comes from my own launcher UI kit (GPL-3.0-or-later).
 
 ## For developers
 
