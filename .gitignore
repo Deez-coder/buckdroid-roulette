@@ -52,3 +52,4 @@ __pycache__/
 # Native converter library, built from native/ by native/build_android.bat
 /launcher/jniLibs/
 *.idsig
+/reporter logs/
