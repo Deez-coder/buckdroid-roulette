@@ -455,3 +455,10 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   EMQX/HiveMQ/Mosquitto/Eclipse answer on 443), background DNS for the IPv4 retry, 10 s connect limit, join
   diagnostics, log flush override also applied on app update. Verified: two PC copies join over the internet room
   (no LAN), and a fake broker no longer blocks polling (worst poll 14 ms). Not verified: the testers' networks.
+- 2026-11-27 1.0.4 (versionCode 5): the 1.0.3 logs showed both testers reaching all 4 brokers (meeting step fixed);
+  the Huawei's log stopped right after "joining a lobby / broker connected" (before create_offer returned) and, as
+  host, before "a player is connecting" (set_remote_description). libdatachannel's setLocalDescription gathers
+  candidates synchronously and libjuice resolves the STUN host with getaddrinfo on that thread. Fix: resolve STUN
+  hosts with IP.resolve_hostname_queue_item (IPv4, 6 s) at host/join and pass "stun:<ip>:<port>". Verified on PC:
+  internet join 3/3 (one earlier failure: same-PC hairpin flakiness), and with unresolvable STUN names no hang (join
+  fails with the game's error). Not verified: the Huawei network itself.

@@ -8,6 +8,10 @@ Format: each entry says **what**, **where** (our file or setting), and **why**.
 
 ## Unreleased
 
+### Fixes (1.0.4): freeze when connecting online
+- **STUN servers looked up in the background** (`src/net/session.gd`): when a connection starts, the WebRTC library (libjuice) looks up the STUN server's name with a blocking lookup on the game's own thread. On a network where that lookup hangs, the game froze the moment it joined, or, when hosting, the moment someone asked to join. The game now looks the STUN servers up in the background when it hosts or joins (up to 6 s) and hands the library the addresses; if no address is found it connects without STUN and says so in the log. *Why:* the 1.0.3 logs of two testers who could not play together: both reached all four meeting servers, but the Huawei phone's log stopped exactly at the WebRTC call, as joiner and as host (the other player then got no answer).
+- **Log lines before the WebRTC calls** (`session.gd`), so if anything there ever hangs again the log shows which call.
+
 ### Fixes (1.0.3): online joining
 - **A 4th meeting server, on port 443** (`src/net/room_signal.gd`): players find each other through public MQTT brokers; the three before all use unusual ports (8084, 8884, 8081), which some mobile and public networks block. `public.cloud.shiftr.io` on the normal web port 443 (with its shared public login) gets through those. *Why:* two testers in different countries could not join each other (one got no answer, the other a black screen); their logs showed no sign of the join reaching the other side.
 - **No more freezes while the meeting servers are unreachable** (`room_signal.gd`): reconnecting looked up the broker's address in a way that blocks the game; on networks where that lookup hangs, the game froze for seconds again and again. The lookup now runs in the background. Brokers also get 10 s instead of 5 s to answer (a PC on home internet already missed two with 5 s).

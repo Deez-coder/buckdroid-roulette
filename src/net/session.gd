@@ -40,6 +40,7 @@ const MSG_CTL := 1
 const MSG_GAME := 2
 const MSG_CHAT := 3
 const STUN := ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"]
+const STUN_WAIT := 6.0            # longest wait for the STUN servers' addresses before connecting without them
 const OFFER_RETRY := 4.0
 const REJOIN_GRACE := 20.0        # a dropped connection gets this long to come back before the game hears "left"
 const MAX_QUEUE := 512            # game messages held for a member while its connection comes back
@@ -88,6 +89,8 @@ var _announce: PacketPeerUDP
 var _listen: PacketPeerUDP
 var _announce_timer := 0.0
 var _found := {}                  # lobby_id -> {ip, port, name, members, limit, seen}
+var _stun := {}                   # STUN url -> {host, port, rid, ip, state: 0 looking up, 1 found, 2 failed}
+var _stun_started := -1.0
 var _joining := 0
 var _join_started := 0.0
 var _join_peer: Peer
@@ -215,6 +218,7 @@ func create_lobby(limit: int) -> void:
 	members = [{"id": my_id, "name": my_name}]
 	lobby_data = {}
 	_kicked.clear()
+	_resolve_stun()
 	_start_room(lobby_id)
 	print("[buckdroid] lobby hosted (local port %d, internet room on)" % _server.get_local_port())
 	lobby_created.emit.call_deferred(true, lobby_id)
@@ -237,6 +241,7 @@ func join_lobby(id: int) -> void:
 	_joining = id
 	_join_started = _now()
 	print("[buckdroid] joining a lobby (local network and internet room)")
+	_resolve_stun()
 	_start_listening()
 	_start_room(id)
 	if _direct_host != "":
@@ -415,6 +420,7 @@ func send_chat(text: String) -> void:
 func _process(delta: float) -> void:
 	if not available:
 		return
+	_poll_stun()
 	_poll_discovery(delta)
 	if _room:
 		_room.poll()
@@ -493,8 +499,11 @@ func _new_peer(via_room := false) -> Peer:
 	var p := Peer.new()
 	p.via_room = via_room
 	p.pc = WebRTCPeerConnection.new()
-	# Over the internet, public STUN servers tell each side its public address (local network: not needed).
-	p.pc.initialize({"iceServers": [{"urls": STUN}] if via_room else []})
+	# Over the internet, public STUN servers tell each side its public address (local network: not needed). They are
+	# given as addresses, not names: the WebRTC library looks a name up with a blocking lookup on the game's thread
+	# when the connection starts, and on networks where that lookup hangs the game froze (tester report, 1.0.3).
+	var urls := _stun_urls()
+	p.pc.initialize({"iceServers": [{"urls": urls}] if via_room and not urls.is_empty() else []})
 	p.ch = p.pc.create_data_channel("bd", {"negotiated": true, "id": 1})
 	p.pc.session_description_created.connect(func(type: String, sdp: String) -> void:
 		p.pc.set_local_description(type, sdp)
@@ -556,6 +565,52 @@ static func _strip_host_candidates(sdp: String) -> String:
 	return "\n".join(out)
 
 
+# --- STUN server addresses, looked up in the background ----------------------------------------------------------------
+func _resolve_stun() -> void:
+	if _stun_started >= 0.0 and (not _stun_urls().is_empty() or _now() - _stun_started < 60.0):
+		return                           # found already (or tried less than a minute ago)
+	_stun_started = _now()
+	for u in STUN:
+		var rest: String = u.trim_prefix("stun:")
+		var host := rest.get_slice(":", 0)
+		_stun[u] = {"host": host, "port": rest.get_slice(":", 1), "ip": "", "state": 0,
+				"rid": IP.resolve_hostname_queue_item(host, IP.TYPE_IPV4)}
+
+
+func _poll_stun() -> void:
+	for u in _stun:
+		var e: Dictionary = _stun[u]
+		if e.state != 0:
+			continue
+		var st := IP.get_resolve_item_status(e.rid)
+		if st == IP.RESOLVER_STATUS_WAITING and _now() - _stun_started < STUN_WAIT:
+			continue
+		if st == IP.RESOLVER_STATUS_DONE:
+			e.ip = str(IP.get_resolve_item_address(e.rid))
+		e.state = 1 if e.ip != "" else 2
+		IP.erase_resolve_item(e.rid)
+		print("[buckdroid] STUN server %s: %s" % [e.host, "found" if e.state == 1 else "could not be looked up"])
+
+
+## True once a STUN address is known, every lookup has ended, or the wait is over: connections can start.
+func _stun_done() -> bool:
+	if not _stun_urls().is_empty() or _now() - _stun_started >= STUN_WAIT:
+		return true
+	for u in _stun:
+		if _stun[u].state == 0:
+			return false
+	return true
+
+
+func _stun_urls() -> Array:
+	var out := []
+	for u in STUN:
+		var e: Dictionary = _stun.get(u, {})
+		if e.get("state", 0) == 1:
+			out.append("stun:%s:%s" % [e.ip, e.port])
+	return out
+
+
 # --- the internet room ------------------------------------------------------------------------------------------------
 func _start_room(id: int) -> void:
 	if _room:
@@ -568,9 +623,11 @@ func _start_room(id: int) -> void:
 ## Joining through the room: once a broker is connected, make one peer and send its offer to the room (to everyone:
 ## only the host answers). Resent until answered, since brokers deliver at most once.
 func _poll_room_join() -> void:
-	if is_host or _joining == 0 or _room == null or _room.connected_count() == 0:
+	if is_host or _joining == 0 or _room == null or _room.connected_count() == 0 or not _stun_done():
 		return
 	if _join_peer == null:
+		# Logged before the WebRTC calls: if one of them ever hangs, the log shows which (1.0.3 tester freeze).
+		print("[buckdroid] room: starting the connection (STUN %d)" % _stun_urls().size())
 		var p := _new_peer(true)
 		p.key = 0
 		_join_peer = p
@@ -592,8 +649,11 @@ func _on_room(from: String, m: Dictionary) -> void:
 			p = q
 	if is_host:
 		if p == null:
+			if not _stun_done():
+				return                  # the joiner sends its offer again every few seconds
 			if t != "sdp" or str(m.get("type", "")) != "offer" or not (joinable or not _held.is_empty()) 					or _peers.size() >= member_limit - 1:
 				return
+			print("[buckdroid] room: a player asks to connect (STUN %d)" % _stun_urls().size())
 			p = _new_peer(true)
 			p.key = _next_key
 			_next_key += 1
