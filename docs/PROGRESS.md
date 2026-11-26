@@ -462,3 +462,10 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   hosts with IP.resolve_hostname_queue_item (IPv4, 6 s) at host/join and pass "stun:<ip>:<port>". Verified on PC:
   internet join 3/3 (one earlier failure: same-PC hairpin flakiness), and with unresolvable STUN names no hang (join
   fails with the game's error). Not verified: the Huawei network itself.
+- 2026-11-27 open issue (parked by the user): with 1.0.4, Alpha and Niko still could not connect, but the user's own
+  phone and Alpha's played together fine online, so the problem is specific to Niko's phone or network (Huawei
+  ANG-LX1, Android 10, GMT+4). Next time: get Niko's 1.0.4 logs. They now show the STUN lookups, a line before each
+  WebRTC call, and "direct connection failed" with its state. If the log stops right after "starting the
+  connection" / "a player asks to connect", the freeze is still inside the WebRTC library (then look at libjuice's
+  socket setup and interface listing on Android 10 / EMUI); if it says "direct connection failed", his network blocks
+  direct paths and only a TURN relay could help.
