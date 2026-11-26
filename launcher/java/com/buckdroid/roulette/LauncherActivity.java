@@ -275,9 +275,69 @@ public class LauncherActivity extends KitActivity {
         show(0);
     }
 
+    /* ------------------------------------------------------------ Graphics presets
+     * (user request, after a tester's budget phone ran at 15 fps.) One tap sets the picture and frame-rate settings below;
+     * the defaults stay the original PC look ("High"). The preset shown is worked out from the current settings, so
+     * changing any of them by hand shows "Custom". Values per key, in this order: High, Medium, Low. */
+    static final String[] PRESET_KEYS = {"render_scale", "shadow_resolution", "shadow_softness", "shadow_refresh", "mesh_detail", "fps_cap"};
+    static final String[] PRESET_DEFAULTS = {"1.00", "4096", "2", "1", "1.0", "60"};
+    static final String[][] PRESETS = {
+        {"1.00", "4096", "2", "1", "1.0", "60"},     /* High: the defaults, the original PC look */
+        {"0.85", "2048", "1", "2", "1.0", "60"},     /* Medium: lighter shadows, slightly lower 3D resolution */
+        {"0.60", "1024", "0", "3", "2.0", "30"},     /* Low: budget phones (e.g. Mali-G57 class), 30 fps */
+    };
+    static final String[] PRESET_NAMES = {"High", "Medium", "Low"};
+
+    static boolean sameValue(String a, String b) {
+        try { return Math.abs(Double.parseDouble(a) - Double.parseDouble(b)) < 0.001; }
+        catch (NumberFormatException e) { return a.equalsIgnoreCase(b); }
+    }
+
+    /* 0 High, 1 Medium, 2 Low, -1 Custom. */
+    static int currentPreset(Ini g) {
+        for (int p = 0; p < PRESETS.length; p++) {
+            boolean all = true;
+            for (int k = 0; k < PRESET_KEYS.length && all; k++)
+                all = sameValue(g.get(PRESET_KEYS[k], PRESET_DEFAULTS[k]), PRESETS[p][k]);
+            if (all) return p;
+        }
+        return -1;
+    }
+
+    LinearLayout presetCard(Ini g) {
+        LinearLayout c = card();
+        c.addView(header("Graphics preset"));
+        int cur = currentPreset(g);
+        LinearLayout seg = new LinearLayout(this);
+        seg.setPadding(0, dp(6), 0, 0);
+        for (int i = 0; i < PRESET_NAMES.length; i++) {
+            final int pi = i;
+            boolean on = i == cur;
+            TextView b = text(PRESET_NAMES[i], 13, on ? android.graphics.Color.WHITE : DIM, true);
+            b.setGravity(android.view.Gravity.CENTER);
+            b.setPadding(dp(10), dp(8), dp(10), dp(8));
+            b.setBackground(round(on ? ACCENT2 : CARD2, 10));
+            b.setOnClickListener(x -> {
+                for (int k = 0; k < PRESET_KEYS.length; k++) g.set(PRESET_KEYS[k], PRESETS[pi][k]);
+                show(tab);
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+            lp.setMargins(i == 0 ? 0 : dp(4), 0, 0, 0);
+            seg.addView(b, lp);
+        }
+        c.addView(seg);
+        String help = cur == 0 ? "High: the original PC look (the default). Heavy: made for fast phones."
+                : cur == 1 ? "Medium: lighter shadows and 85% 3D resolution. For upper mid-range phones."
+                : cur == 2 ? "Low: 60% 3D resolution, simple shadows, reduced objects, 30 fps. For budget phones."
+                : "Custom: your own mix of the settings below. Pick a preset to start over from it.";
+        c.addView(text(help, 12, DIM, false));
+        return c;
+    }
+
     /* ------------------------------------------------------------ Graphics (src/core/settings.gd reads these keys) */
     void graphicsPage() {
         Ini g = graphics();
+        content.addView(presetCard(g));
         LinearLayout p = card();
         p.addView(header("Picture"));
         p.addView(slider(g, "render_scale", "3D resolution", 50, 100, 5, 100, "%", 0.01f,

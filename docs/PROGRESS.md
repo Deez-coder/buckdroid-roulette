@@ -435,3 +435,7 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   "copied" message text, which did not catch it on the phone; now our handler is connected to the game button's
   pressed signal (after the game's) and writes the code 0.2 s later. PC test with the clipboard cleared before each
   press: both buttons leave the code. Ready for release (user).
+- 2026-11-26 tester report: realme RMX3963 (Dimensity 6300, Mali-G57 MC2, 1604x720) at 15 fps. Its log: the session ran
+  at 100% 3D resolution with 2048 shadows and a 30 fps cap (75% and the performance log were set afterwards), so no
+  frame data yet. Added graphics presets at the top of the launcher's Graphics page (High = the defaults, Medium,
+  Low; Custom when edited by hand). Reporter logs stay out of git (they hold the player's name and IDs).
