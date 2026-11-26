@@ -3,7 +3,8 @@ extends RefCounted
 ## being able to read anything. Original code, part of Buckdroid Roulette (GPL-3.0-or-later). See docs/MULTIPLAYER.md.
 ##
 ## The meeting points are public MQTT brokers, reached over secure WebSockets (wss), several at once: a message goes
-## through all of them and duplicates are dropped, so one broker being down or slow does not matter.
+## through all of them and duplicates are dropped, so one broker being down or slow does not matter. One of them is on
+## port 443 (the normal web port): some mobile and public networks block the others' ports (8084, 8884, 8081).
 ##
 ## What a broker sees: a topic that is a hash of the room code (never the code), and messages it cannot read or forge.
 ##   key material  K = SHA-256 iterated 20000 times over "buckdroid-room-v1|<code>" (slows down guessing codes from
@@ -23,6 +24,7 @@ const BROKERS := [
 	"wss://broker.emqx.io:8084/mqtt",
 	"wss://broker.hivemq.com:8884/mqtt",
 	"wss://test.mosquitto.org:8081/mqtt",
+	"wss://public.cloud.shiftr.io:443#public:public",   # "#user:password": the broker's shared public login
 ]
 const KDF_ROUNDS := 20000
 const MAX_AGE := 120.0
@@ -68,6 +70,7 @@ func _open_ws(url: String, ipv4: String) -> WebSocketPeer:
 	ws.inbound_buffer_size = 256 * 1024
 	var host := url.get_slice("//", 1).get_slice("/", 0).get_slice(":", 0)
 	var tls := TLSOptions.client() if ipv4 == "" else TLSOptions.client(null, host)
+	url = url.get_slice("#", 0)
 	ws.connect_to_url(url if ipv4 == "" else url.replace("//" + host, "//" + ipv4), tls)
 	return ws
 
@@ -75,6 +78,8 @@ func _open_ws(url: String, ipv4: String) -> WebSocketPeer:
 func stop() -> void:
 	for c in _conns:
 		c.ws.close()
+		if c.get("rid", -1) >= 0:
+			IP.erase_resolve_item(c.rid)
 	_conns.clear()
 
 
@@ -108,7 +113,19 @@ func poll() -> void:
 			if now >= c.retry_at:
 				var ip := ""
 				if c.v4:
-					ip = IP.resolve_hostname(c.url.get_slice("//", 1).get_slice("/", 0).get_slice(":", 0), IP.TYPE_IPV4)
+					# Looked up in the background: a blocking lookup froze the game for seconds at a time on networks
+					# where the lookup hangs (tester report, 1.0.2: black screen while joining).
+					if c.get("rid", -1) < 0:
+						c.rid = IP.resolve_hostname_queue_item(_host(c.url), IP.TYPE_IPV4)
+						c.rid_at = now
+						continue
+					var rs := IP.get_resolve_item_status(c.rid)
+					if rs == IP.RESOLVER_STATUS_WAITING and now - c.rid_at < 8.0:
+						continue
+					if rs == IP.RESOLVER_STATUS_DONE:
+						ip = IP.get_resolve_item_address(c.rid)
+					IP.erase_resolve_item(c.rid)
+					c.rid = -1
 				c.ws = _open_ws(c.url, ip)
 				c.state = 0
 				c.started = now
@@ -121,7 +138,7 @@ func poll() -> void:
 		var failed := false
 		if st == WebSocketPeer.STATE_OPEN:
 			if c.state == 0:
-				ws.put_packet(_connect_packet())
+				ws.put_packet(_connect_packet(c.url))
 				c.state = 1
 				c.last_ping = now
 				c.last_rx = now
@@ -136,11 +153,15 @@ func poll() -> void:
 				ws.put_packet(PackedByteArray([0xC0, 0x00]))   # PINGREQ
 			# no answer to pings, or the broker never accepted us: the connection is dead even if the socket looks open
 			failed = now - c.last_rx > KEEPALIVE * 1.5 or (c.state == 1 and now - c.started > 10.0)
-		elif st == WebSocketPeer.STATE_CLOSED or (st == WebSocketPeer.STATE_CONNECTING and now - c.started > 5.0):
+		elif st == WebSocketPeer.STATE_CLOSED or (st == WebSocketPeer.STATE_CONNECTING and now - c.started > 10.0):
+			# 10 s: secure connections to far-away brokers on slow mobile networks take several seconds; with 5 s even a
+			# PC on home internet gave up on two brokers before they answered.
 			failed = true
 		if failed:
 			ws.close()
 			c.fails += 1
+			if c.fails <= 3 or c.state == 2:
+				print("[buckdroid] room: %s %s (try %d)" % [_host(c.url), "lost" if c.state == 2 else "unreachable", c.fails])
 			# Alternate between the normal address and IPv4 (some networks resolve to IPv6 they cannot reach), and
 			# wait a little longer after each failure (2 s up to 20 s).
 			c.v4 = not c.v4
@@ -154,12 +175,21 @@ func poll() -> void:
 		_seen.erase(n)
 
 
+static func _host(url: String) -> String:
+	return url.get_slice("#", 0).get_slice("//", 1).get_slice("/", 0).get_slice(":", 0)
+
+
 # --- MQTT 3.1.1, the few packets needed --------------------------------------------------------------------------------
-func _connect_packet() -> PackedByteArray:
+func _connect_packet(url: String) -> PackedByteArray:
+	var login := url.get_slice("#", 1) if "#" in url else ""
 	var v := PackedByteArray()
 	v.append_array(_mqtt_str("MQTT"))
-	v.append_array(PackedByteArray([4, 0x02, KEEPALIVE >> 8, KEEPALIVE & 0xFF]))   # level 4, clean session
+	var flags := 0x02 | (0xC0 if login != "" else 0)                          # clean session (+ user name, password)
+	v.append_array(PackedByteArray([4, flags, KEEPALIVE >> 8, KEEPALIVE & 0xFF]))   # level 4
 	v.append_array(_mqtt_str("bd" + _crypto.generate_random_bytes(10).hex_encode()))
+	if login != "":
+		v.append_array(_mqtt_str(login.get_slice(":", 0)))
+		v.append_array(_mqtt_str(login.get_slice(":", 1)))
 	return _fixed(0x10, v)
 
 
@@ -204,6 +234,7 @@ func _parse(c: Dictionary) -> void:
 			9:   # SUBACK
 				c.state = 2
 				c.fails = 0
+				print("[buckdroid] room: %s connected" % _host(c.url))
 			3:   # PUBLISH
 				if body.size() < 2:
 					continue

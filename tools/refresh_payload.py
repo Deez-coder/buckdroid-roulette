@@ -40,6 +40,9 @@ def main() -> None:
     first_game = next(k for k in pb.keys() if k.startswith("autoload/"))
     for a in json.loads(payload["res://payload/autoloads.json"])["autoloads"]:
         pb.insert_before(first_game, "autoload/" + a["name"], "*" + RES + a["script"])
+    versions = json.loads(payload["res://payload/versions.json"])   # the same overrides the launcher's update applies
+    for k, v in (versions["overrides"]["common"] | versions["overrides"]["android"]).items():
+        pb.set(k, v)
     if dev:
         with open(os.path.join(ROOT, "src_dev", "test_driver.gd"), "rb") as f:
             ours[RES + "dev/test_driver.gd"] = f.read()

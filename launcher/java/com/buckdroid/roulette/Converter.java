@@ -133,6 +133,11 @@ final class Converter implements Runnable {
             JSONObject a = autoloads.getJSONObject(i);
             pb.insertBefore(firstGameAutoload, "autoload/" + a.getString("name"), "*res://buckdroid/" + a.getString("script"));
         }
+        /* The settings overrides too, so a new override reaches games set up by an older version (1.0.3: the log is
+           written line by line, so a session that freezes and is closed by hand still leaves its log). */
+        JSONObject ov = new JSONObject(asset("payload/versions.json")).getJSONObject("overrides");
+        applyOverrides(pb, ov.getJSONObject("common"));
+        applyOverrides(pb, ov.getJSONObject("android"));
         Map<String, byte[]> replaced = new LinkedHashMap<>();
         replaced.put("res://project.binary", pb.toBytes());
         entries.removeIf(e -> e.path.startsWith("res://buckdroid/"));      /* scripts the new version no longer has */

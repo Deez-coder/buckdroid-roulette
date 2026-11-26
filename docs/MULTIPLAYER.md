@@ -163,7 +163,7 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
 - Next: room codes over the internet (step 4), nickname and chat settings, reconnects, chat.
 
 ## Step 4: room codes over the internet (2026-11-24)
-- `src/net/room_signal.gd`: encrypted signalling through three public MQTT brokers over wss (EMQX, HiveMQ, Mosquitto
+- `src/net/room_signal.gd`: encrypted signalling through four public MQTT brokers over wss (EMQX, HiveMQ, Mosquitto, and since 1.0.3 shiftr.io on port 443
   public brokers), as designed above. Reconnects by itself (the game pauses while the player is in another app, e.g.
   sharing the code), alternates between the normal address and IPv4 (networks that resolve to unreachable IPv6), and
   notices dead connections through missed pings.

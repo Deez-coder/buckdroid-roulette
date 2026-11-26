@@ -17,4 +17,4 @@ python -m SCons platform=android target=%TARGET% arch=arm64 disable_path_overrid
 cd platform\android\java
 rem The app's own ID (not com.godot.game), so it never collides with other Godot games.
 rem The app's version (shown in the launcher): change both for every release (the code must always go up).
-call .\gradlew.bat generateGodotTemplates -Pexport_package_name=com.buckdroid.roulette -Pexport_version_name=1.0.2 -Pexport_version_code=3 || exit /b 1
+call .\gradlew.bat generateGodotTemplates -Pexport_package_name=com.buckdroid.roulette -Pexport_version_name=1.0.3 -Pexport_version_code=4 || exit /b 1

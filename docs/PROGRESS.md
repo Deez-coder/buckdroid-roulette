@@ -449,3 +449,9 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   (death.tscn changes scene from _ready) -> queue full -> segfault in CallQueue::statistics(); symbolized with the
   unstripped release lib and reproduced on PC with the test driver (gotoscene main, then death). Editor crash:
   getInsetsController() before setContentView on HyperOS. Phone not used (busy with another project).
+- 2026-11-26 1.0.3 (versionCode 4): two testers (Samsung S24 Ultra, Android 16; Huawei ANG-LX1, Android 10, another
+  country) could not join each other. Logs: the host never saw the join; the Huawei's black-screen sessions left empty
+  logs (no flush in release builds). Changes: 4th broker on 443 (shiftr.io public login; checked from PC: none of
+  EMQX/HiveMQ/Mosquitto/Eclipse answer on 443), background DNS for the IPv4 retry, 10 s connect limit, join
+  diagnostics, log flush override also applied on app update. Verified: two PC copies join over the internet room
+  (no LAN), and a fake broker no longer blocks polling (worst poll 14 ms). Not verified: the testers' networks.

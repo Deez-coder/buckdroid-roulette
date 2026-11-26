@@ -41,7 +41,8 @@
       "rendering/reflections/reflection_atlas/reflection_size.mobile": 256,
       "rendering/textures/vram_compression/import_etc2_astc": true,
       "display/window/handheld/orientation": 4,
-      "debug/file_logging/enable_file_logging": true
+      "debug/file_logging/enable_file_logging": true,
+   "application/run/flush_stdout_on_print": true
     }
   }
 }

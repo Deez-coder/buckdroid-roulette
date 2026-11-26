@@ -236,6 +236,7 @@ func join_lobby(id: int) -> void:
 		return
 	_joining = id
 	_join_started = _now()
+	print("[buckdroid] joining a lobby (local network and internet room)")
 	_start_listening()
 	_start_room(id)
 	if _direct_host != "":
@@ -433,6 +434,8 @@ func _process(delta: float) -> void:
 				_join_peer = null
 			var id := _joining
 			_joining = 0
+			print("[buckdroid] join failed: no answer from a host in %d s (room servers connected: %d of %d)" % [
+					int(ROOM_JOIN_TIMEOUT), _room.connected_count() if _room else 0, RoomSignal.BROKERS.size()])
 			lobby_joined.emit(id, ENTER_DOESNT_EXIST)
 	for key in _peers.keys():
 		var p: Peer = _peers.get(key)
@@ -573,6 +576,7 @@ func _poll_room_join() -> void:
 		_join_peer = p
 		_peers[0] = p
 		p.pc.create_offer()
+		print("[buckdroid] room: asking the host to connect (%d room servers)" % _room.connected_count())
 		return
 	var jp := _join_peer
 	if jp.via_room and not jp.open and jp.room_sid == "" and jp.has_meta("offer") and _now() - float(jp.get_meta("offer_at")) > OFFER_RETRY:
@@ -596,6 +600,7 @@ func _on_room(from: String, m: Dictionary) -> void:
 			p.room_sid = from
 			_peers[p.key] = p
 			p.pc.set_remote_description("offer", str(m.get("sdp", "")))
+			print("[buckdroid] room: a player is connecting")
 			return
 	else:
 		var jp := _join_peer
@@ -606,6 +611,7 @@ func _on_room(from: String, m: Dictionary) -> void:
 				return
 			jp.room_sid = from          # the host
 			jp.pc.set_remote_description("answer", str(m.get("sdp", "")))
+			print("[buckdroid] room: the host answered, connecting directly")
 			return
 		p = jp
 	if p and t == "cand":
@@ -637,9 +643,15 @@ func _poll_peer(p: Peer) -> void:
 		if p.ch.get_ready_state() == WebRTCDataChannel.STATE_OPEN:
 			p.open = true
 			p.last_heard = _now()
+			print("[buckdroid] connected %s in %.1f s" % ["over the internet" if p.via_room else "on the local network",
+					_now() - p.started])
 			if not is_host:
 				_send_ctl(p, {"t": "hello", "proto": PROTOCOL, "ver": game_version, "id": my_id, "name": my_name})
 		elif _now() - p.started > (JOIN_TIMEOUT * 2 if p.via_room else JOIN_TIMEOUT):
+			if not (p.via_room and p.room_sid == "" and not is_host):
+				print("[buckdroid] direct connection failed (%s, connection state %d, gathering state %d)" % [
+						"internet" if p.via_room else "local network", p.pc.get_connection_state(),
+						p.pc.get_gathering_state()])
 			if not is_host and _joining != 0:
 				if p.via_room and p.room_sid == "":
 					return                       # nobody answered yet: the lobby timeout above decides
