@@ -84,6 +84,10 @@ made the decisions and tested everything on real phones.
 - **Buckshot Roulette** is made by Mike Klubnika and published by CRITICAL REFLEX. This project only makes your own copy
   run on Android. Please [buy the game](https://store.steampowered.com/app/2835570/Buckshot_Roulette/).
 
+**Discord**
+- [Deez-coder's server](https://discord.gg/b9GN2Ypktw): the home of all of Deez-coder's ports.
+- [V Alpha server](https://discord.gg/y9YrUfNj7Y)
+
 ## License
 
 The project's own code (everything in this repository) is licensed under the **GNU General Public License v3.0 or later**,
