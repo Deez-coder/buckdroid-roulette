@@ -1,5 +1,10 @@
 # Buckdroid Roulette
 
+> [!WARNING]
+> **This GitHub repository is the only official source of Buckdroid Roulette.** Only download the app from this
+> repository's [Releases](https://github.com/Deez-coder/buckdroid-roulette/releases) page. I can't confirm that a copy
+> from anywhere else is safe, or that it is up to date.
+
 I made Buckdroid Roulette so that people who own **Buckshot Roulette** on Steam can play their own copy on an Android
 phone, single player and online multiplayer.
 
