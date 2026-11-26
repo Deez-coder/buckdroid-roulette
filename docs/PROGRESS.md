@@ -439,3 +439,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   at 100% 3D resolution with 2048 shadows and a 30 fps cap (75% and the performance log were set afterwards), so no
   frame data yet. Added graphics presets at the top of the launcher's Graphics page (High = the defaults, Medium,
   Low; Custom when edited by hand). Reporter logs stay out of git (they hold the player's name and IDs).
+- 2026-11-26 presets measured on the S24 Ultra (release 1.0.1, single player, same scene and moment, heat guard off,
+  15 s windows, GPU load = clock x busy): High 60 fps, 956 MHz x 79% = 754; Medium 59.5 fps, 515 x 70% = 362 (-52%);
+  Low 30 fps (its cap), 231 x 49% = 113 (-85%); Low at 60 fps 319 x 73% = 232 (-69%: the picture alone). The game
+  logged every preset value (render scale, shadow atlas, refresh, mesh detail). Screenshots: same look, Low slightly
+  softer. Version 1.0.1 (code 2), since 1.0.0 is published.
