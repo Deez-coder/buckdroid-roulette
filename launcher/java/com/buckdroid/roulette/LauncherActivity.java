@@ -54,8 +54,13 @@ public class LauncherActivity extends KitActivity {
             finish();
             return;
         }
+        /* Sent here by the game because its scripts were out of date (StaleScripts): start it once they are updated. */
+        playAfterUpdate = ACTION_PLAY.equals(getIntent().getAction()) && getIntent().getBooleanExtra(StaleScripts.EXTRA_AFTER_UPDATE, false);
+        if (playAfterUpdate) toast("Updating the game first...");
         super.onCreate(b);
     }
+
+    boolean playAfterUpdate;
 
     static final String ACTION_PLAY = "com.buckdroid.roulette.PLAY";
 
@@ -147,6 +152,10 @@ public class LauncherActivity extends KitActivity {
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 if ("done".equals(c.state)) toast("The game is ready.");
                 show(tab);
+                if (playAfterUpdate && "done".equals(c.state) && gameReady() && scriptsCurrent()) {
+                    playAfterUpdate = false;
+                    startActivity(new Intent().setClassName(LauncherActivity.this, GAME_ACTIVITY));
+                }
                 return;
             }
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

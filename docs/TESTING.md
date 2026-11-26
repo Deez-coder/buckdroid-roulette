@@ -14,8 +14,7 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 3. Open Buckdroid Roulette, tap "Pick Buckshot Roulette.exe" and choose the file. Setup takes a couple of minutes;
    everything stays on the phone.
 4. Tap Play. You can delete the .exe afterwards.
-5. **After installing a newer version, start the game with Play in the launcher** (not from the recent-apps screen):
-   the first Play updates the game's scripts.
+5. After installing a newer version, the first start updates the game's scripts (about a minute), then the game opens.
 
 ## Multiplayer
 - One player hosts a table (Multiplayer). The 18-digit lobby ID is shown at the top right ("Copy lobby ID" copies

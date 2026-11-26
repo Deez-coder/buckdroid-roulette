@@ -418,3 +418,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   cursor gone" reports right after installs: the game reopened from recent apps runs before the launcher's script
   update (Play) and still had the old scripts. Next: a startup check in the game activity that sends the player to the
   launcher when the scripts are out of date (user: later).
+- 2026-11-26 stale-scripts safeguard (StaleScripts.java + engine patch 46-0019): GodotApp checks convert_status.json's
+  payload against Converter.payloadHash before super.onCreate; if different, it opens the launcher (PLAY + an
+  after-update extra), finishes and ends the :game process before the engine starts; the launcher refreshes the scripts
+  (onResume) and starts the game when done. Tested on the phone: normal start unchanged; with the status marked out of
+  date, opening the game from recent apps went launcher -> update -> game, status payload current again.

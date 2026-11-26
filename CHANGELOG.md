@@ -9,6 +9,7 @@ Format: each entry says **what**, **where** (our file or setting), and **why**.
 ## Unreleased
 
 ### Launcher
+- **Never older scripts after an update** (`StaleScripts.java`, engine patch 46-0019): Android can reopen the game directly (recent apps), skipping the launcher that updates the game's scripts, so after an app update the game ran the previous version's scripts. The game now checks at start; if its scripts are not this version's, the launcher opens, updates them and starts the game by itself, and the game process ends before loading anything. *Why:* "fixed" bugs seemed to come back right after updates during testing.
 - **Export logs** (About page, "Report a problem"; `LogExport.java`): the game's log files, the app's own system log, the newest performance logs, the settings and the phone model go into one zip in Downloads, and the share menu opens. *Why:* user request, so testers can send logs with bug reports. The app sends nothing by itself; the card says the zip contains the multiplayer name, player ID and lobby IDs.
 - **Reset all settings** (About page, with a confirmation): deletes `graphics.ini`, `controls.ini` and `multiplayer.ini`, so every setting is back to its default; the converted game stays. *Why:* user request.
 - **Conversion runs inside the launcher** (`Converter.java`, `native/bdconvert.cpp`), with its progress in place of the Play button. *Why:* the old way opened a separate engine window for it and needed an 800 MB copy of the .exe.

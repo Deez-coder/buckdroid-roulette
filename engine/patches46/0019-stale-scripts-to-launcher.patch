@@ -1,0 +1,33 @@
+From 42e2c613c6510b0993083c6a3756ef89badf1125 Mon Sep 17 00:00:00 2001
+From: buckdroid <buckdroid@localhost>
+Date: Thu, 26 Nov 2026 12:23:30 +0300
+Subject: [PATCH] Buckdroid: the game activity hands over to the launcher when
+ its scripts are out of date
+
+---
+ .../java/app/src/main/java/com/godot/game/GodotApp.java  | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java b/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java
+index 4f14ccb..1d74d6b 100644
+--- a/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java
++++ b/platform/android/java/app/src/main/java/com/godot/game/GodotApp.java
+@@ -72,6 +72,15 @@ public class GodotApp extends GodotActivity {
+ 
+ 	@Override
+ 	public void onCreate(Bundle savedInstanceState) {
++		// Buckdroid: never run an older version's scripts after an app update (Android can reopen this activity
++		// directly, skipping the launcher that updates them). The launcher opens instead, and this process ends before
++		// the engine has done anything (StaleScripts in launcher/java).
++		if (!com.buckdroid.roulette.StaleScripts.check(this)) {
++			super.onCreate(null);
++			finish();
++			new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> android.os.Process.killProcess(android.os.Process.myPid()));
++			return;
++		}
+ 		SplashScreen.installSplashScreen(this);
+ 		EdgeToEdge.enable(this);
+ 		super.onCreate(savedInstanceState);
+-- 
+2.53.0.windows.2
+
