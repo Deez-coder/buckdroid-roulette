@@ -46,20 +46,33 @@ public class TouchLayoutEditorActivity extends Activity {
 
     /* Full screen with the bars hidden until a swipe (the game's window does the same, so the places match). */
     public static void fullScreen(Activity a) {
-        if (Build.VERSION.SDK_INT >= 28)
-            a.getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-        a.getWindow().setDecorFitsSystemWindows(false);
-        WindowInsetsController c = a.getWindow().getInsetsController();
-        if (c != null) {
-            c.hide(WindowInsets.Type.systemBars());
-            c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        /* Called after setContentView, and getDecorView() first: on some phones (tester report: Xiaomi, Android 15)
+           getInsetsController() does not create the window's decor view and crashed with a NullPointerException when
+           called before it existed. Full screen is only cosmetic, so a failure here must never close the editor. */
+        try {
+            View decor = a.getWindow().getDecorView();
+            if (Build.VERSION.SDK_INT >= 28)
+                a.getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            if (Build.VERSION.SDK_INT >= 30) {
+                a.getWindow().setDecorFitsSystemWindows(false);
+                WindowInsetsController c = a.getWindow().getInsetsController();
+                if (c != null) {
+                    c.hide(WindowInsets.Type.systemBars());
+                    c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } else {
+                decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+            }
+        } catch (RuntimeException e) {
+            android.util.Log.w("Buckdroid", "full screen failed", e);
         }
     }
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if (focus) fullScreen(this); }
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
-        fullScreen(this);
         String path = getIntent().getStringExtra(EXTRA_FILE);
         ini = new Ini(path != null ? new File(path) : new File(new File(getExternalFilesDir(null), "config"), "controls.ini"));
         scale = TouchLayout.clamp(TouchLayout.num(ini.get("touch_scale", "1.0"), 1f), 0.6f, 1.6f);
@@ -97,6 +110,7 @@ public class TouchLayoutEditorActivity extends Activity {
         lp.topMargin = dp(70);
         page.addView(bar, lp);
         setContentView(page);
+        fullScreen(this);
         changed();
     }
 

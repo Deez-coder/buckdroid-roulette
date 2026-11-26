@@ -60,8 +60,11 @@ func _restore_clear_color() -> void:
 	if get_tree().current_scene != null:
 		RenderingServer.set_default_clear_color(_clear_color)
 		_blacked_out = false
-	else:
-		_restore_clear_color.call_deferred()
+	elif not get_tree().process_frame.is_connected(_restore_clear_color):
+		# Try again next frame. Not call_deferred: a deferred call made during the deferred-call flush runs in the same
+		# flush, so while no scene is in (the death screen changes scene from its own _ready) it re-queued itself
+		# forever, filled Godot's message queue and crashed the game when the player died (tester report, 1.0.1).
+		get_tree().process_frame.connect(_restore_clear_color, CONNECT_ONE_SHOT)
 
 
 func _fix_mesh_instance(mi: MeshInstance3D) -> void:

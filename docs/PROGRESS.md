@@ -444,3 +444,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   Low 30 fps (its cap), 231 x 49% = 113 (-85%); Low at 60 fps 319 x 73% = 232 (-69%: the picture alone). The game
   logged every preset value (render scale, shadow atlas, refresh, mesh detail). Screenshots: same look, Low slightly
   softer. Version 1.0.1 (code 2), since 1.0.0 is published.
+- 2026-11-26 1.0.2 (versionCode 3): two crashes from a tester (Xiaomi 23124RA7EO, Adreno 610, Android 15). Death
+  crash: newer_engine.gd's clear-colour restore re-deferred itself inside the message-queue flush while no scene was in
+  (death.tscn changes scene from _ready) -> queue full -> segfault in CallQueue::statistics(); symbolized with the
+  unstripped release lib and reproduced on PC with the test driver (gotoscene main, then death). Editor crash:
+  getInsetsController() before setContentView on HyperOS. Phone not used (busy with another project).
