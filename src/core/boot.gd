@@ -105,28 +105,37 @@ func _update_lobby_code(scene: Node) -> void:
 	_code_label.text = "LOBBY CODE\n" + (LobbyCode.encode(id) if id != 0 else "")
 
 
-# The game's own "COPY LOBBY ID" puts the 18 digits on the clipboard and pops up its "copied" message. That message is
-# watched (its text, not the clipboard), and the short code goes on the clipboard instead; the message is changed so
-# the next copy is noticed too.
-var _copy_label: Label
-var _copied_text := ""
+# The game's own "COPY LOBBY ID" puts the 18 digits on the clipboard. Our handler is connected to the same button's
+# "pressed" signal (after the game's), and a moment later (so two clipboard writes cannot land out of order on a phone)
+# puts the short code there instead and says so in the game's message line. (The first version watched that message's
+# text; on the tester's phone the digits stayed on the clipboard.)
+var _copy_hooked_scene: Node
 const CODE_COPIED := "LOBBY CODE COPIED"
 
 
 func _watch_copy_button(scene: Node) -> void:
-	if _copy_label == null or not is_instance_valid(_copy_label) or not _copy_label.is_inside_tree():
-		var lm := _find_lobby_manager(scene)
-		if lm == null:
-			return
-		_copy_label = lm.get("ui_copypaste_console_pop") as Label
-		_copied_text = tr("MP_UI LOBBY ID MESSAGE COPIED")
-		if _copy_label == null:
-			return
-	if _copy_label.text == _copied_text and _copied_text != "":
-		var gs := get_node_or_null(^"/root/GlobalSteam")
-		if gs and gs.LOBBY_ID != 0:
-			DisplayServer.clipboard_set(LobbyCode.encode(gs.LOBBY_ID))
-			_copy_label.text = CODE_COPIED
+	if scene == _copy_hooked_scene:
+		return
+	for n in scene.find_children("*", "Node", true, false):
+		var sc: Script = n.get_script()
+		if sc and sc.resource_path.get_file() == "MP_ButtonClassMain.gd" and n.get("alias") == "copy lobby id":
+			var b = n.get("button")
+			if b is BaseButton:
+				b.pressed.connect(_copy_code_after_game, CONNECT_DEFERRED)
+				_copy_hooked_scene = scene
+				return
+
+
+func _copy_code_after_game() -> void:
+	await get_tree().create_timer(0.2, true, false, true).timeout
+	var gs := get_node_or_null(^"/root/GlobalSteam")
+	if gs == null or gs.LOBBY_ID == 0:
+		return
+	DisplayServer.clipboard_set(LobbyCode.encode(gs.LOBBY_ID))
+	var lm := _find_lobby_manager(get_tree().current_scene)
+	var msg: Label = lm.get("ui_copypaste_console_pop") as Label if lm else null
+	if msg:
+		msg.text = CODE_COPIED
 
 
 func _build_lobby_ui(scene: Node) -> void:

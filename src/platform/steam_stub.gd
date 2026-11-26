@@ -99,12 +99,14 @@ func isSteamRunningOnSteamDeck() -> bool:
 	return false
 
 func activateGameOverlayInviteDialog(lobby_id: int) -> void:
-	# No Steam overlay: copy the lobby ID so it can be sent to friends (the game's own "join with ID" pastes it).
+	# No Steam overlay: copy the short lobby code (src/net/lobby_code.gd) so it can be sent to friends; pasted back,
+	# BuckdroidBoot turns it into the 18 digits the game's "join with ID" expects.
 	if lobby_id != 0:
-		DisplayServer.clipboard_set(str(lobby_id))
+		var code: String = load("res://buckdroid/net/lobby_code.gd").encode(lobby_id)
+		DisplayServer.clipboard_set(code)
 		var toast := get_node_or_null(^"/root/BuckdroidToast")
 		if toast and toast.has_method("show_text"):
-			toast.show_text("Lobby ID copied: %d" % lobby_id)
+			toast.show_text("Lobby code copied: " + code)
 
 # --- achievements / stats: kept on the device by the Platform layer ----------------------------------------------
 func setAchievement(api_name: String) -> bool:

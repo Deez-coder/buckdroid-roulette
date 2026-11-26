@@ -430,3 +430,8 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   button at the top left for Tap/Trackpad. Short lobby codes (Crockford base32, 12 chars). PC tests: 2000 code round
   trips, join by lower-case code, copy button copies the code, in-game menu + chat + focus back to Continue,
   disconnect -> lobby, lobby back twice -> menu.
+- 2026-11-26 match with v1 on the code build: no bugs. Report: "Copy lobby ID" and "Invite friends" copied the
+  18 digits. Invite: the Steam stub copied str(lobby_id); now the code. Copy: the first version watched the game's
+  "copied" message text, which did not catch it on the phone; now our handler is connected to the game button's
+  pressed signal (after the game's) and writes the code 0.2 s later. PC test with the clipboard cleared before each
+  press: both buttons leave the code. Ready for release (user).

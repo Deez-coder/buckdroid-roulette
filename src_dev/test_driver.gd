@@ -228,11 +228,17 @@ func _run() -> void:
 				bootn4._entry.text = code2.to_lower().replace("-", "")
 				bootn4._join_typed()
 				_log("typecode: typed '%s', note '%s'" % [bootn4._entry.text, bootn4._entry_note.text])
-			"copycode":  # copycode: press the game's COPY LOBBY ID and show the clipboard and the shown code
+			"copycode":  # copycode <alias>: press the game's button (copy lobby id / invite friends) and show the clipboard and the shown code
 				var lm2 := _find_by_script(get_tree().root, "MP_LobbyManager.gd")
-				lm2.CopyLobbyID()
-				await get_tree().process_frame
-				await get_tree().process_frame
+				var copy_btn: Node = null
+				for n in get_tree().current_scene.find_children("*", "Node", true, false):
+					var scb: Script = n.get_script()
+					if scb and scb.resource_path.get_file() == "MP_ButtonClassMain.gd" and n.get("alias") == p[1].replace("+", " "):
+						copy_btn = n
+				DisplayServer.clipboard_set("cleared")
+				if copy_btn:
+					copy_btn.get("button").pressed.emit()     # as a real press does: the game's handler, then ours
+				await get_tree().create_timer(0.5).timeout
 				var bootn5 := get_node_or_null(^"/root/BuckdroidBoot")
 				_log("copycode: clipboard '%s', label '%s', message '%s'" % [DisplayServer.clipboard_get(), bootn5._code_label.text.replace("
 ", " / "),
