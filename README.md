@@ -58,8 +58,10 @@ Vulkan.
 
 ## Lower-end phones
 
-The defaults aim at the PC look, and I tuned them on a high-end phone (Galaxy S24 Ultra). On a slower or older phone,
-open the launcher's **Graphics** page and lower things until the game runs smoothly. Roughly from most to least effect:
+The default settings are set up to look as close to the original PC game as possible, and that is heavy: I tuned them
+on a high-end phone (Galaxy S24 Ultra). On a mid-range or lower-end phone you will probably need to adjust the
+graphics settings: open the launcher's **Graphics** page and lower things until the game runs smoothly. Roughly from
+most to least effect:
 
 1. **3D resolution**: 70-80% is hard to notice on a phone screen and saves a lot.
 2. **Cooler shadows**: almost no visible difference, noticeably cooler.
