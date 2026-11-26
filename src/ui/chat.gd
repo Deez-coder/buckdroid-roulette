@@ -148,15 +148,7 @@ func _on_focus_changed(c: Control) -> void:
 	if not _is_overlay(c):
 		_game_focus = c
 		return
-	var scene := get_tree().current_scene
-	if scene != _cm_scene:
-		_cm_scene = scene
-		_controller_managers = []
-		if scene:
-			for n in scene.find_children("*", "Node", true, false):
-				var sc: Script = n.get_script()
-				if sc and sc.resource_path.get_file() == "MP_ControllerManager.gd":
-					_controller_managers.append(n)
+	_refresh_controller_managers()
 	var keep: Control = _game_focus if is_instance_valid(_game_focus) and _game_focus.is_inside_tree() else null
 	for cm in _controller_managers:
 		if is_instance_valid(cm) and _is_overlay(cm.get("previousFocus")):
@@ -178,6 +170,45 @@ func register(c: Control) -> void:
 		_overlay.append(c)
 		if c is LineEdit:
 			c.gui_input.connect(_on_field_key.bind(c))
+			c.focus_exited.connect(func() -> void: _give_focus_back.call_deferred())
+
+
+## When one of our text fields lets go of the focus (chat closed, message sent and keyboard closed, a tap elsewhere)
+## and nothing else has it, the control the game had focused before gets it back, if a controller (or the on-screen
+## pad) is in use: the game's controller navigation needs a focused control, and without this the pad did nothing
+## after chatting (tester report). The game's own menus do the same when they close (MP_IngameLobbyUI.RevertInitialFocus).
+func _give_focus_back() -> void:
+	if get_viewport().gui_get_focus_owner() != null or not _controller_in_use():
+		return
+	if is_instance_valid(_game_focus) and _game_focus.is_inside_tree() and _game_focus.is_visible_in_tree() \
+			and _game_focus.focus_mode != Control.FOCUS_NONE:
+		_game_focus.grab_focus()
+
+
+func _controller_in_use() -> bool:
+	var settings := get_node_or_null(^"/root/BuckdroidSettings")
+	if settings and settings.get_value("controls", "touch_mode") == "pad":
+		return true
+	_refresh_controller_managers()
+	for cm in _controller_managers:
+		if is_instance_valid(cm):
+			var cur = cm.get("cursor")
+			if cur and cur.get("controller_active") == true:
+				return true
+	return false
+
+
+func _refresh_controller_managers() -> void:
+	var scene := get_tree().current_scene
+	if scene == _cm_scene:
+		return
+	_cm_scene = scene
+	_controller_managers = []
+	if scene:
+		for n in scene.find_children("*", "Node", true, false):
+			var sc: Script = n.get_script()
+			if sc and sc.resource_path.get_file() == "MP_ControllerManager.gd":
+				_controller_managers.append(n)
 
 
 ## The game's input map has no keys for "ui_text_submit" (Godot's Enter-in-a-text-field action), so Enter (and the

@@ -30,7 +30,7 @@ Vulkan.
 - Saves are kept apart from the PC game's. Achievements and the Double or Nothing best score are kept on the phone.
 
 **Online multiplayer**
-- The game's own multiplayer mode works without Steam. Host a table, share the lobby ID, and the others paste or type it in. On the same Wi-Fi, lobbies are also found
+- The game's own multiplayer mode works without Steam. Host a table, share the short lobby code (12 characters, like `7K3Q-M9XD-2PHT`), and the others paste or type it in. On the same Wi-Fi, lobbies are also found
   automatically.
 - Players connect directly to each other (peer-to-peer, encrypted). There's no game server, and no account is needed.
 - Short connection drops reconnect on their own; a player's seat is held for 20 seconds.

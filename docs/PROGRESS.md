@@ -423,3 +423,10 @@ User decision: peer-to-peer online play by room code, local Wi-Fi play and an in
   after-update extra), finishes and ends the :game process before the engine starts; the launcher refreshes the scripts
   (onResume) and starts the game when done. Tested on the phone: normal start unchanged; with the status marked out of
   date, opening the game from recent apps went launcher -> update -> game, status payload current again.
+- 2026-11-26 tester reports + request: pad dead after using the chat (no control had the focus after the chat field let
+  go; chat.gd now gives the focus back to the game's last control while a controller/pad is in use); Back and the
+  pad's MENU did not leave multiplayer (the MP scenes read "exit game" as an event in _unhandled_input; BuckdroidBack
+  now opens the match's in-game menu with an event and leaves the lobby with MP_LobbyUI.ExitToMainMenu); a house
+  button at the top left for Tap/Trackpad. Short lobby codes (Crockford base32, 12 chars). PC tests: 2000 code round
+  trips, join by lower-case code, copy button copies the code, in-game menu + chat + focus back to Continue,
+  disconnect -> lobby, lobby back twice -> menu.

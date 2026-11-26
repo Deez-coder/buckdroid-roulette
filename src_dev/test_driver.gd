@@ -206,6 +206,53 @@ func _run() -> void:
 			"chatlog":  # chatlog: the chat lines received so far and the CHAT button's text
 				var chat2 := get_node_or_null(^"/root/BuckdroidChat")
 				_log("chatlog: shown %s, button '%s', popup '%s', lines %s" % [chat2._layer.visible, chat2._button.text, chat2._popup.text, chat2._lines])
+			"codetest":  # codetest: lobby code round trips (random IDs, the smallest and largest, misread letters, junk)
+				var LC := load("res://buckdroid/net/lobby_code.gd")
+				var bad := 0
+				var rng := RandomNumberGenerator.new()
+				for i in 2000:
+					var id: int = 100000000000000000 + ((rng.randi() << 30) ^ rng.randi()) % 900000000000000000
+					var code: String = LC.encode(id)
+					if LC.decode(code) != id or LC.decode(code.to_lower()) != id or LC.parse(code.replace("-", " ")) != id or LC.parse(str(id)) != id:
+						bad += 1
+				var lo: String = LC.encode(100000000000000000)
+				var hi: String = LC.encode(999999999999999999)
+				var misread: int = LC.decode(lo.replace("0", "O").replace("1", "l"))
+				_log("codetest: %d bad of 2000; min %s max %s; O/l misread ok %s; junk %d %d %d" % [bad, lo, hi,
+						misread == 100000000000000000, LC.decode("hello world!"), LC.decode("ZZZZ-ZZZZ-ZZZZ"), LC.parse("12345")])
+			"typecode":  # typecode <file>: type the saved lobby ID as its short code (lower case, no dashes) and join
+				var LC2 := load("res://buckdroid/net/lobby_code.gd")
+				var code2: String = LC2.encode(int(FileAccess.get_file_as_string(p[1]).strip_edges()))
+				var bootn4 := get_node_or_null(^"/root/BuckdroidBoot")
+				bootn4._open_entry()
+				bootn4._entry.text = code2.to_lower().replace("-", "")
+				bootn4._join_typed()
+				_log("typecode: typed '%s', note '%s'" % [bootn4._entry.text, bootn4._entry_note.text])
+			"copycode":  # copycode: press the game's COPY LOBBY ID and show the clipboard and the shown code
+				var lm2 := _find_by_script(get_tree().root, "MP_LobbyManager.gd")
+				lm2.CopyLobbyID()
+				await get_tree().process_frame
+				await get_tree().process_frame
+				var bootn5 := get_node_or_null(^"/root/BuckdroidBoot")
+				_log("copycode: clipboard '%s', label '%s', message '%s'" % [DisplayServer.clipboard_get(), bootn5._code_label.text.replace("
+", " / "),
+						lm2.ui_copypaste_console_pop.text])
+			"back":  # back: the Android back button (BuckdroidBack)
+				get_node(^"/root/BuckdroidBack")._on_back()
+				await get_tree().process_frame
+				await get_tree().process_frame
+			"ingameui":  # ingameui: whether the match's in-game menu is open, and the focus
+				var igl := _find_by_script(get_tree().root, "MP_IngameLobbyUI.gd")
+				var fo3 := get_viewport().gui_get_focus_owner()
+				_log("ingameui: open %s, focus %s" % [igl.get("viewing_ui") if igl else "?", fo3.name if fo3 else "<none>"])
+			"disconnect":  # disconnect: the in-game menu's "disconnect" confirmed (leaves the match)
+				var inter := _find_by_script(get_tree().root, "MP_InteractionIntermediary.gd")
+				inter.InteractionPipe("disconnect confirmation yes", null)
+			"menutap":  # menutap: a real tap on the on-screen MENU button (house, top left)
+				var bb := get_node(^"/root/BuckdroidBack")
+				if bb._button:
+					await _touch(_to_window(bb._button.get_global_rect().get_center()))
+				_log("menutap: button %s" % [bb._button != null])
 			"inputmap":  # inputmap <action, + for spaces>: the events bound to an action
 				var an := p[1].replace("+", " ")
 				if InputMap.has_action(an):

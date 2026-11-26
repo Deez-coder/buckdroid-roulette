@@ -26,8 +26,11 @@ func _process(_delta: float) -> void:
 	_check_lobby_focus(scene)
 
 
-# --- lobby ID on the lobby screen: shown as text, typed in, pasted with or without spaces ---------------------------------
-# (user requests: read the ID without pasting it somewhere; type an ID in; spaces in a pasted ID must not matter)
+# --- lobby ID on the lobby screen: shown as a short code, typed in, pasted with or without spaces --------------------------
+# (user requests: read the ID without pasting it somewhere; type an ID in; spaces in a pasted ID must not matter; a
+# shorter ID.) The lobby ID is shown, copied and typed as a 12-character code (LobbyCode, e.g. 7K3Q-M9XD-2PHT); the
+# 18-digit number still works everywhere.
+const LobbyCode := preload("res://buckdroid/net/lobby_code.gd")
 const LOBBY_SCENE := "res://multiplayer/scenes/mp_lobby.tscn"
 const LOBBY_ID_DIGITS := 18          # the game's "join with pasted ID" accepts exactly 18 characters
 var _code_layer: CanvasLayer
@@ -41,14 +44,18 @@ var _on_lobby_screen := false
 
 
 func _notification(what: int) -> void:
-	# Back from another app (where the ID was copied, often from a chat message with spaces): make the clipboard hold
-	# the bare 18 digits, so the game's paste button accepts it. Read only then, not continuously (Android shows a
-	# notice whenever an app reads the clipboard).
+	# Back from another app (where the code or ID was copied, often from a chat message): make the clipboard hold the
+	# bare 18 digits, so the game's own paste button accepts it (it takes exactly 18 characters). Read only then, not
+	# continuously (Android shows a notice whenever an app reads the clipboard).
 	if what == NOTIFICATION_APPLICATION_FOCUS_IN and _on_lobby_screen:
 		var c := DisplayServer.clipboard_get().strip_edges()
 		var digits := _digits_only(c)
 		if c.length() <= 40 and digits.length() == LOBBY_ID_DIGITS and digits != c and _only_id_characters(c):
 			DisplayServer.clipboard_set(digits)
+		elif c.length() <= 20:
+			var from_code: int = LobbyCode.decode(c)
+			if from_code != 0:
+				DisplayServer.clipboard_set(str(from_code))
 
 
 static func _digits_only(t: String) -> String:
@@ -78,6 +85,7 @@ func _update_lobby_code(scene: Node) -> void:
 	if not on_screen:
 		_code_shown = -1
 		return
+	_watch_copy_button(scene)
 	# While typing on a phone, keep the entry box above the on-screen keyboard.
 	if _panel.visible:
 		var chat := get_node_or_null(^"/root/BuckdroidChat")
@@ -94,11 +102,31 @@ func _update_lobby_code(scene: Node) -> void:
 		return
 	_code_shown = id
 	_code_label.visible = id != 0
-	var digits := str(id)
-	var groups := PackedStringArray()
-	for k in range(0, digits.length(), 3):
-		groups.append(digits.substr(k, 3))
-	_code_label.text = "LOBBY ID\n" + " ".join(groups)
+	_code_label.text = "LOBBY CODE\n" + (LobbyCode.encode(id) if id != 0 else "")
+
+
+# The game's own "COPY LOBBY ID" puts the 18 digits on the clipboard and pops up its "copied" message. That message is
+# watched (its text, not the clipboard), and the short code goes on the clipboard instead; the message is changed so
+# the next copy is noticed too.
+var _copy_label: Label
+var _copied_text := ""
+const CODE_COPIED := "LOBBY CODE COPIED"
+
+
+func _watch_copy_button(scene: Node) -> void:
+	if _copy_label == null or not is_instance_valid(_copy_label) or not _copy_label.is_inside_tree():
+		var lm := _find_lobby_manager(scene)
+		if lm == null:
+			return
+		_copy_label = lm.get("ui_copypaste_console_pop") as Label
+		_copied_text = tr("MP_UI LOBBY ID MESSAGE COPIED")
+		if _copy_label == null:
+			return
+	if _copy_label.text == _copied_text and _copied_text != "":
+		var gs := get_node_or_null(^"/root/GlobalSteam")
+		if gs and gs.LOBBY_ID != 0:
+			DisplayServer.clipboard_set(LobbyCode.encode(gs.LOBBY_ID))
+			_copy_label.text = CODE_COPIED
 
 
 func _build_lobby_ui(scene: Node) -> void:
@@ -112,7 +140,7 @@ func _build_lobby_ui(scene: Node) -> void:
 		_code_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_code_layer.add_child(_code_label)
 		_type_button = Button.new()
-		_type_button.text = "TYPE A LOBBY ID"
+		_type_button.text = "TYPE A LOBBY CODE"
 		_type_button.flat = true
 		_type_button.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_place(_type_button, -330, 142, -30, 172)
@@ -131,11 +159,11 @@ func _build_lobby_ui(scene: Node) -> void:
 		box.add_theme_constant_override(&"separation", 10)
 		_panel.add_child(box)
 		var title := Label.new()
-		title.text = "TYPE THE LOBBY ID"
+		title.text = "TYPE THE LOBBY CODE"
 		box.add_child(title)
 		_entry = LineEdit.new()
-		_entry.placeholder_text = "18 digits, spaces are fine"
-		_entry.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+		_entry.placeholder_text = "12-letter code (or the 18 digits)"
+		_entry.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT     # codes have letters
 		_entry.max_length = 40
 		_entry.text_submitted.connect(func(_t: String) -> void: _join_typed())
 		box.add_child(_entry)
@@ -218,16 +246,16 @@ func _open_entry() -> void:
 
 
 func _join_typed() -> void:
-	var digits := _digits_only(_entry.text)
-	if digits.length() != LOBBY_ID_DIGITS:
-		_entry_note.text = "A lobby ID has %d digits (%d typed)." % [LOBBY_ID_DIGITS, digits.length()]
+	var id: int = LobbyCode.parse(_entry.text)
+	if id == 0:
+		_entry_note.text = "A lobby code has 12 letters and digits, like 7K3Q-M9XD-2PHT."
 		return
 	var lm := _find_lobby_manager(get_tree().current_scene)
 	if lm == null:
 		_entry_note.text = "The lobby screen is not ready yet."
 		return
 	_panel.visible = false
-	lm.join_lobby(int(digits))
+	lm.join_lobby(id)
 
 
 func _find_lobby_manager(n: Node) -> Node:

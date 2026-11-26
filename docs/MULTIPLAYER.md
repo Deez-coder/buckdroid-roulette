@@ -106,6 +106,11 @@ behind it). The game's scripts stay unchanged; the game "thinks" it is talking t
   and lobby screens and on our boxes (TouchPad.setPassThrough / setPassRects).
 - Later: per-player mute.
 
+### Lobby codes
+- The lobby ID (18 digits, ~60 random bits) is shown, copied and typed as a 12-character Crockford base32 code
+  (src/net/lobby_code.gd). The number itself is unchanged, so signalling, room lookup and its encryption keep the full
+  randomness; the code is not shortened further for that reason. 18-digit IDs are still accepted everywhere.
+
 ### Latency
 - The game reads one packet per frame; with multiplayer.ini read_backlog = on (default) the rest of a burst is handed to
   the game's own read_p2p_packet() in the same frame (up to the game's PACKET_READ_LIMIT). BuckdroidNet receives before

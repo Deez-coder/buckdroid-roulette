@@ -17,9 +17,11 @@ For people trying the app. It contains no part of Buckshot Roulette: you need yo
 5. After installing a newer version, the first start updates the game's scripts (about a minute), then the game opens.
 
 ## Multiplayer
-- One player hosts a table (Multiplayer). The 18-digit lobby ID is shown at the top right ("Copy lobby ID" copies
-  it). The others join with the game's "join with pasted ID", or tap "TYPE A LOBBY ID" and type it. Spaces don't
-  matter either way. Everyone needs the same test build.
+- One player hosts a table (Multiplayer). The lobby code (12 characters, like 7K3Q-M9XD-2PHT) is shown at the top
+  right; the game's "Copy lobby ID" copies it. The others join with the game's "join with pasted ID", or tap
+  "TYPE A LOBBY CODE" and type it. Case, dashes and spaces don't matter; the old 18-digit IDs still work.
+- Leaving: in a match, Back (or the house button at the top left) opens the game's menu, where "disconnect" leaves.
+  In the lobby and elsewhere, press it twice. In Buttons mode the pad's house button does the same.
 - Same Wi-Fi works best; over mobile data most networks work, some strict ones do not (the app says so).
 - Look around: two fingers (one finger on an empty spot in Buttons mode, or a controller's left trigger + stick).
 - Players in a lobby can see each other's internet address, as in any peer-to-peer game.
