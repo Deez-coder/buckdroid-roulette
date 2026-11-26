@@ -18,7 +18,7 @@ phone, single player and online multiplayer.
    stores the result in its own folder. This happens once and takes a few minutes.
 4. Press Play.
 
-Supported game version: Buckshot Roulette v2.2.0 (Steam, Windows). Phones: Android 7.0 or newer, 64-bit (arm64) with
+Supported game version: Buckshot Roulette **v2.2.0 (hotfix 6)**, Steam, Windows (other versions are refused at setup). Phones: Android 7.0 or newer, 64-bit (arm64) with
 Vulkan.
 
 ## Features
